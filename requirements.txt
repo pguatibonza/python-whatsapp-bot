@@ -3,3 +3,7 @@ python-dotenv
 openai
 langchain
 langchain-openai
+pypdf
+unstructured[pdf]
+pymupdf
+faiss-cpu
