@@ -4,6 +4,11 @@ openai
 langchain
 langchain-openai
 pypdf
+unstructured
 unstructured[pdf]
 pymupdf
 faiss-cpu
+pdf2image
+pdfminer
+pdfminer.six
+opencv-python

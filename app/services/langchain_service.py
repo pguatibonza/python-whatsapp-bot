@@ -10,7 +10,9 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
-
+import shelve
+from langchain_community.document_loaders import PDFMinerLoader
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from dotenv import load_dotenv
 import logging
 import os
@@ -30,6 +32,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 chat = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.2)
 
 
+
 def upload_file_pypdf(file_path):
     loader=PyPDFLoader(file_path)
     pages=loader.load_and_split()
@@ -44,34 +47,84 @@ def upload_file_pymu(file_path):
     loader=PyMuPDFLoader(file_path)
     data=loader.load()
     return data
-
-def create_db_from_pdf(file_path):
-    
-    data=upload_file_pymu(file_path)
-
-    #Split data into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
-    all_splits = text_splitter.split_documents(data)
-
-    #Create vectors from the chunks and save them into the FAISS db
+#Mejor, segementa mejor la info
+def upload_file_miner(file_path):
+    loader=PDFMinerLoader(file_path)
+    data=loader.load()
+    return data
+#Load pdfs and create text splits
+def create_from_directory(file_directory):
     embeddings=OpenAIEmbeddings()
-    db = FAISS.from_documents(all_splits, embeddings)
+    data=[]
+    for file in os.listdir(file_directory):
+        path=os.path.join(file_directory,file)
+        loader=PDFMinerLoader(path)
+        data+=loader.load()
 
-    return db
+        logging.info(f"Documento cargado desde el archivo {path}")
 
-    #Create retriever
-    retriever=db.as_retriever()
-#db=create_db_from_pdf("../../data/airbnb-faq.pdf")
-db=create_db_from_pdf("data/airbnb-faq.pdf")
+    text_splitter=RecursiveCharacterTextSplitter(chunk_size=500,chunk_overlap=100)
+
+    all_splits=text_splitter.split_documents(data)
+
+    logging.info("Documentos spliteados")
+    return all_splits
+
+#Take a directory and create/add vectors to the vector store
+def add_pdfs_from_directory(file_directory):
+    embeddings=OpenAIEmbeddings()
+    try:
+        vector_store=FAISS.load_local("db",embeddings)
+
+        logging.info("Vector store cargada")
+
+        all_splits=create_from_directory(file_directory)
+        vector_store.add_documents(all_splits,embeddings)
+
+        logging.info("Documentos añadidos")
+    except :
+        all_splits=create_from_directory(file_directory)
+
+        logging.info("Documentos añadidos y creados")
+
+        vector_store=FAISS.from_documents(all_splits,embeddings)
+
+        logging.info("Vector store creada")
+    vector_store.save_local("db")
+
+    logging.info("Vector store guardada")
+    return vector_store
+
+
+#db=add_pdfs_from_directory("../../data/")
+db=add_pdfs_from_directory("data/")
+
 store = {}
 #Gets the chat history based on the cellphone number (id)
+#For production use cases, you will want to use a persistent implementation of chat message history, such as RedisChatMessageHistory
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
     #Si no existe un historial de mensajes, crea uno
+    
+    # with shelve.open("threads_db",writeback=True) as threads_shelf:
+    #     if session_id not in threads_shelf:
+    #         print("No session history")
+            
+    #         logging.info(f"Creating new session history for {session_id}")
+    #         threads_shelf[session_id]=ChatMessageHistory()
+    #         logging.info(f"Session history for {session_id} created")
+    #     print(threads_shelf[session_id])
+    #     logging.info(f"Session history for {session_id} retrieved")
+    #     return threads_shelf[session_id]
+
     if session_id not in store:
         logging.info(f"Creating new session history for {session_id}")
-        store[session_id] = ChatMessageHistory()
+        store[session_id]=ChatMessageHistory()
         logging.info(f"Session history for {session_id} created")
+
     return store[session_id]
+        
+
+
 
 #Create a Prompt template  with a LLM model
 def create_chain():
@@ -105,7 +158,7 @@ def run_chain(message_body,wa_id,context,conversation_chain):
     return message.content
 
 #Delete messages from the database
-def trim_messages(chain_input,wa_id,conversation_limit):
+def trim_messages(chain_input,wa_id,conversation_limit=4):
 
     stored_messages = store[wa_id].messages
     if len(stored_messages) <= conversation_limit:
@@ -131,12 +184,13 @@ def generate_response(message_body,wa_id,name):
     context=retriever.invoke(message_body)
 
     #Delete messages if they exceed the conversation limit
-    #conversation_chain_with_trimming=(RunnablePassthrough.assign(messages_trimmed=trim_messages) | {"chain_input":conversation_chain,"wa_id":wa_id})
+    conversation_chain_with_trimming=(RunnablePassthrough.assign(messages_trimmed=trim_messages) | {"chain_input":conversation_chain,"wa_id":wa_id})
 
     #Create response
     response_message=run_chain(message_body,wa_id,context,conversation_chain)
 
     return response_message
 
-
+response=generate_response("me llamo Pablo","123","Pablo")
+print(get_session_history("123"))
 

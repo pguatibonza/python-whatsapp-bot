@@ -90,3 +90,5 @@ db/
 
 # Exlcude the database file
 .db
+
+data/
