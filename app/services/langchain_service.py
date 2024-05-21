@@ -29,7 +29,7 @@ If the context doesn't contain any relevant information to the question, don't m
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-chat = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.2)
+chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
 
 
 
@@ -75,20 +75,14 @@ def add_pdfs_from_directory(file_directory):
     embeddings=OpenAIEmbeddings()
     try:
         vector_store=FAISS.load_local("db",embeddings)
-
         logging.info("Vector store cargada")
-
         all_splits=create_from_directory(file_directory)
         vector_store.add_documents(all_splits,embeddings)
-
         logging.info("Documentos añadidos")
     except :
         all_splits=create_from_directory(file_directory)
-
         logging.info("Documentos añadidos y creados")
-
         vector_store=FAISS.from_documents(all_splits,embeddings)
-
         logging.info("Vector store creada")
     vector_store.save_local("db")
 
@@ -103,18 +97,6 @@ store = {}
 #Gets the chat history based on the cellphone number (id)
 #For production use cases, you will want to use a persistent implementation of chat message history, such as RedisChatMessageHistory
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    #Si no existe un historial de mensajes, crea uno
-    
-    # with shelve.open("threads_db",writeback=True) as threads_shelf:
-    #     if session_id not in threads_shelf:
-    #         print("No session history")
-            
-    #         logging.info(f"Creating new session history for {session_id}")
-    #         threads_shelf[session_id]=ChatMessageHistory()
-    #         logging.info(f"Session history for {session_id} created")
-    #     print(threads_shelf[session_id])
-    #     logging.info(f"Session history for {session_id} retrieved")
-    #     return threads_shelf[session_id]
 
     if session_id not in store:
         logging.info(f"Creating new session history for {session_id}")
@@ -139,6 +121,7 @@ def create_chain():
         ]
     )
     chain = prompt | chat
+    #chain=create_stuff_documents_chain(chat,prompt)
     return chain
 
 # Get the chain with the session history
@@ -184,13 +167,13 @@ def generate_response(message_body,wa_id,name):
     context=retriever.invoke(message_body)
 
     #Delete messages if they exceed the conversation limit
-    conversation_chain_with_trimming=(RunnablePassthrough.assign(messages_trimmed=trim_messages) | {"chain_input":conversation_chain,"wa_id":wa_id})
+    #conversation_chain_with_trimming=(RunnablePassthrough.assign(messages_trimmed=trim_messages) | conversation_chain)
 
     #Create response
     response_message=run_chain(message_body,wa_id,context,conversation_chain)
 
     return response_message
 
-response=generate_response("me llamo Pablo","123","Pablo")
-print(get_session_history("123"))
+#response=generate_response("me llamo Pablo","123","Pablo")
+#print(get_session_history("123"))
 
