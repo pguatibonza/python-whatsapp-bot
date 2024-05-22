@@ -14,6 +14,8 @@ import shelve
 from langchain_community.document_loaders import PDFMinerLoader
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from dotenv import load_dotenv
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain.agents import AgentExecutor, create_openai_tools_agent
 import logging
 import os
 
@@ -30,6 +32,7 @@ If the context doesn't contain any relevant information to the question, don't m
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
+tools=[TavilySearchResults(max_results=1)]
 
 
 
@@ -109,7 +112,8 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
 
 
 #Create a Prompt template  with a LLM model
-def create_chain():
+def create_chain_agent():
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -118,11 +122,13 @@ def create_chain():
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    chain = prompt | chat
+    agent= create_openai_tools_agent(chat,tools,prompt)
+    agent_executor=AgentExecutor(agent=agent,tools=tools,verbose=True)
     #chain=create_stuff_documents_chain(chat,prompt)
-    return chain
+    return agent_executor
 
 # Get the chain with the session history
 def get_chat(chain):
@@ -157,10 +163,10 @@ def trim_messages(chain_input,wa_id,conversation_limit=4):
 
 def generate_response(message_body,wa_id,name):
     #Create chain
-    chain = create_chain()
+    agent_executor = create_chain_agent()
 
     #Get the session history
-    conversation_chain=get_chat(chain)
+    conversation_chain=get_chat(agent_executor)
 
     #Create retriever
     retriever=db.as_retriever(k=4)
