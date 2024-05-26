@@ -18,21 +18,37 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 import logging
 import os
+from . import tools_restaurant 
 
 SYSTEM_TEMPLATE="""
-Answer the user's questions based on the below context. 
-If the context doesn't contain any relevant information to the question, don't make something up and just say "I don't know":
+Eres un chatbot de asistencia al cliente para un restaurante llamado ROOFTOP magadalena. Tu nombre será gloria y le diras al cliente : bienvenido al ROOFTOP magdalena, ¿en que puedo ayudarte el dia de hoy ?
 
+Una de tus funciones sera responder cualquier duda que tenga el cliente 
+respecto al menu del restaurante. Para ello podras usar el contexto que está abajo.
 <context>
 {context}
 </context>
+
+Por otro lado, tambien tendras a la mano 2 funciones, una para validar los horarios disponibles dada una fecha y una cantidad de personas, y otra para hacer la reserva
+de una mesa. 
+
+1. Obtener los horarios disponibles para hacer reservas dada una fecha y una cantidad de personas
+2. hacer una reserva. Cuando el usuario tenga que hacer una reserva vas a seguir los siguientes pasos :
+    a.  le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD, si el usuario no te da el año, asume que es 2024.
+    b. Validas si esa fecha esta disponible y le muestras los horarios.
+    c. Preguntarle si tiene algun comentario con respecto a la reserva para hacercelo saber al restaurante
+    d.  Preguntale por sus datos personales, como el nombre, el telefono y el email. 
+        Asegurate de añadir al numero los caracteres "+57" como sufijo si el cliente no entregó el número en dicho formato. 
+        Asegurate que la dirección de correo electronico sea valida
+    e. Muestrale los datos que el ingresó. Cuando confirme que los datos estan correctos, usa la funcion de crear reserva, antes no :
+ 
 """
 
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
-tools=[TavilySearchResults(max_results=1)]
+tools=tools_restaurant.TOOLS
 
 
 
@@ -142,9 +158,9 @@ def get_chat(chain):
 
 #Generates a response based on an input
 def run_chain(message_body,wa_id,context,conversation_chain):
-    message=conversation_chain.invoke({"input": message_body,"context":context },{"configurable":{"session_id" : wa_id}})
-    logging.info(f"Generated message :  {message.content}")
-    return message.content
+    message=conversation_chain.invoke({"input": message_body,"context":context},{"configurable":{"session_id" : wa_id}})
+    logging.info(f"Generated message :  {message['output']}")
+    return message['output']
 
 #Delete messages from the database
 def trim_messages(chain_input,wa_id,conversation_limit=4):
@@ -160,13 +176,14 @@ def trim_messages(chain_input,wa_id,conversation_limit=4):
     return True
 
 
+#Create chain
+agent_executor = create_chain_agent()
+
+#Get the session history
+conversation_chain=get_chat(agent_executor)
 
 def generate_response(message_body,wa_id,name):
-    #Create chain
-    agent_executor = create_chain_agent()
 
-    #Get the session history
-    conversation_chain=get_chat(agent_executor)
 
     #Create retriever
     retriever=db.as_retriever(k=4)

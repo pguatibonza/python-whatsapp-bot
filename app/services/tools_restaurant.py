@@ -60,17 +60,12 @@ def available_times_at_date(date: str ,people=4,area=None):
     result=results[0]
 
     if len(result['unavailableTimes'] ) == 0:
-        return " The whole day is available for booking"
+        return " The whole day is available for booking. Remember that the reservations begin at mid day and ends at 9 pm"
     else : 
 
         return f" The available booking times for {date} are : {result['availableTimes']} "
 
-tool_available_time=StructuredTool.from_function(
-    func=available_times_at_date,
-    name="available_times_at_date",
-    description="Fetch the available times for booking, given a date and  a number of people",
-    handle_tool_error=True
-)
+
 
 class createBooking(BaseModel):
     date : str =Field(description="Es una fecha en el formato YYYY-MM-DD, debe ser mayor o igual a la fecha actual")
@@ -81,12 +76,13 @@ class createBooking(BaseModel):
     email : str=Field(description="El correo electronico de la persona que hace la reserva")
     name : str=Field(description="Nombre de la persona que hace la reserva")
     area_name : str=Field(description="Nombre del area donde se va a hacer la reserva")
+    comment : str=Field(description="Comentario adicional que hace el cliente para tener en cuenta el dia de la reserva")
     duration : str=Field(description="Duracion de la reserva")
     tables : str=Field(description="Cantidad de mesas que usara el cliente")
 
     
 
-def create_booking(date : str , time : str, people : int , phone : str ,email : str, name : str ,area_name='main', duration = 120 ,tables=1):
+def create_booking(date : str , time : str, people : int , phone : str ,email : str, name : str ,area_name='main', comment = "",duration = 120 ,tables=1):
     """ Create a booking for the given date, time, number of people, and area if desired"""
     #Obtiene el id del area dado un nombre
     area_id=get_area_by_name(area_name)
@@ -105,7 +101,8 @@ def create_booking(date : str , time : str, people : int , phone : str ,email : 
             "email" : email,
         },
         "areaId" : area_id,
-        "status" : "accepted"
+        "status" : "approved",
+        "comment" : comment 
     }
     headers_post=headers
     headers_post['Content-Type']='application/json'
@@ -123,6 +120,15 @@ tool_create_booking=StructuredTool.from_function(
     description="Create a new booking ",
     handle_tool_error=True
 )
+
+tool_available_time=StructuredTool.from_function(
+    func=available_times_at_date,
+    name="available_times_at_date",
+    description="Fetch the available times for booking, given a date and  a number of people",
+    handle_tool_error=True
+)
+
+TOOLS= [tool_create_booking, tool_available_time]
 
 #tools=[tool_create_booking,tool_available_time]
 #from langchain import hub
