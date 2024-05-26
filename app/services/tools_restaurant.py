@@ -36,7 +36,7 @@ class AvailableTimes(BaseModel):
 
 
 def available_times_at_date(date: str ,people=4,area=None):
-    """Fetch the available times for booking, given a date and  a number of people"""
+    """Retorna los horarios disponibles para una reserva, dada una fecha y una cantidad de personas"""
 
     url=BASE_URL + "bookingFlow/times"
 
@@ -55,15 +55,18 @@ def available_times_at_date(date: str ,people=4,area=None):
     if response.status_code == 200:
         results=response.json()
     else: 
-        raise ToolException(f"An error has ocurred with status code  : {response.status_code} and content {response.content}")
+        raise ToolException(f"Ha ocurrido un error con status  : {response.status_code} y contenido {response.content}")
 
-    result=results[0]
+    if len(results)>0:
+        result=results[0]
+    else :
+        return f"No tenemos reservas disponibles para este dia"
 
     if len(result['unavailableTimes'] ) == 0:
-        return " The whole day is available for booking. Remember that the reservations begin at mid day and ends at 9 pm"
+        return " El dia entero esta disponible para reservas. Recuerde que abrimos a las 12 pm y cerramos a las 9pm"
     else : 
 
-        return f" The available booking times for {date} are : {result['availableTimes']} "
+        return f" Los horarios disponibles para reservar en la fecha  {date} son: {result['availableTimes']} "
 
 
 
@@ -83,7 +86,7 @@ class createBooking(BaseModel):
     
 
 def create_booking(date : str , time : str, people : int , phone : str ,email : str, name : str ,area_name='main', comment = "",duration = 120 ,tables=1):
-    """ Create a booking for the given date, time, number of people, and area if desired"""
+    """Crea una reserva dada una fecha, horario, numero de personas y area, si lo desea"""
     #Obtiene el id del area dado un nombre
     area_id=get_area_by_name(area_name)
     if area_id==None:
@@ -117,14 +120,14 @@ def create_booking(date : str , time : str, people : int , phone : str ,email : 
 tool_create_booking=StructuredTool.from_function(
     func=create_booking,
     name="create_booking",
-    description="Create a new booking ",
+    description="Crea una nueva reserva ",
     handle_tool_error=True
 )
 
 tool_available_time=StructuredTool.from_function(
     func=available_times_at_date,
     name="available_times_at_date",
-    description="Fetch the available times for booking, given a date and  a number of people",
+    description=" Retorna los horarios disponibles para hacer una reserva dada una fecha y un numero de personas",
     handle_tool_error=True
 )
 
