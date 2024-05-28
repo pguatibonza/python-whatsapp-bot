@@ -1,27 +1,29 @@
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables import RunnablePassthrough
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.document_loaders import UnstructuredPDFLoader
-from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-import shelve
-from langchain_community.document_loaders import PDFMinerLoader
-from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_community.chat_message_histories import ChatMessageHistory
+import psycopg2
 from dotenv import load_dotenv
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 import logging
 import os
+
 from . import tools_restaurant 
 
-SYSTEM_TEMPLATE="""
-Eres un chatbot de asistencia al cliente para un restaurante llamado ROOFTOP magadalena. Tu nombre será gloria y le diras al cliente : bienvenido al ROOFTOP magdalena, ¿en que puedo ayudarte el dia de hoy ?
+# Configuración inicial
+load_dotenv()
+DB_CONNECTION = os.getenv("DB_CONNECTION")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
+tools=tools_restaurant.TOOLS
+
+# Plantilla del sistema
+SYSTEM_TEMPLATE = """
+Answer the user's questions based on the below context. 
+If the context doesn't contain any relevant information to the question, don't make something up and just say "I don't know":
+>>>>>>> persistent_db
 
 Una de tus funciones sera responder cualquier duda que tenga el cliente 
 respecto al menu del restaurante. Para ello podras usar el contexto que está abajo.
@@ -44,28 +46,17 @@ de una mesa.
     e. Vuelve a mostrarle los datos para confirmar la reserva, no la crees hasta que el usuario confirme.No le puedes dar el id de la reserva
 """
 
-
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-chat = ChatOpenAI(model="gpt-4o", temperature=0)
-tools=tools_restaurant.TOOLS
+def get_db_connection():
+    """ Establece conexión con la base de datos PostgreSQL. """
+    return psycopg2.connect(DB_CONNECTION)
 
 
-
-def upload_file_pypdf(file_path):
-    loader=PyPDFLoader(file_path)
-    pages=loader.load_and_split()
-    return pages
 #No carga bien
 def upload_file_unstructured_pdf(file_path):
     loader=UnstructuredPDFLoader(file_path)
     data=loader.load()
     return data
-#mas rapido
-def upload_file_pymu(file_path):
-    loader=PyMuPDFLoader(file_path)
-    data=loader.load()
-    return data
+
 #Mejor, segementa mejor la info
 def upload_file_miner(file_path):
     loader=PDFMinerLoader(file_path)
@@ -115,15 +106,27 @@ db=add_pdfs_from_directory("data/")
 store = {}
 #Gets the chat history based on the cellphone number (id)
 #For production use cases, you will want to use a persistent implementation of chat message history, such as RedisChatMessageHistory
+
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    """ Fetches or initializes chat message history for a given session ID. """
+    conn = get_db_connection()
+    history = ChatMessageHistory()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT message, response FROM conversations WHERE phone_number = %s ORDER BY timestamp DESC", (session_id,))
+        records = cursor.fetchall()
+        for record in records:
+            # Combine message and response into one string or adjust as necessary
+            combined_message = f"User: {record[0]}, Bot: {record[1]}"
+            history.add_message(combined_message)  # Adjusted to pass one parameter
+    conn.close()
 
-    if session_id not in store:
+    if not records:
         logging.info(f"Creating new session history for {session_id}")
-        store[session_id]=ChatMessageHistory()
-        logging.info(f"Session history for {session_id} created")
+    else:
+        logging.info(f"Session history for {session_id} retrieved with {len(records)} messages")
+    
+    return history
 
-    return store[session_id]
-        
 
 
 
@@ -146,15 +149,29 @@ def create_chain_agent():
     #chain=create_stuff_documents_chain(chat,prompt)
     return agent_executor
 
-# Get the chain with the session history
+def store_message(session_id, message, response):
+    """ Crea y almacena un mensaje en la base de datos """
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO conversations (phone_number, message, response, timestamp)
+            VALUES (%s, %s, %s, NOW())
+        """, (session_id, message, response))
+    conn.commit()
+    conn.close()
+    logging.info(f"Stored message for session {session_id}")
+
+
+
 def get_chat(chain):
-    chain_with_message_history = RunnableWithMessageHistory(
-    chain,
-    get_session_history,
-    input_messages_key="input",
-    history_messages_key="chat_history",
+    """ Configura la cadena con historial de mensajes. """
+    return RunnableWithMessageHistory(
+        chain,
+        get_session_history,
+        input_messages_key="input",
+        history_messages_key="chat_history",
     )
-    return chain_with_message_history
+
 
 #Generates a response based on an input
 def run_chain(message_body,wa_id,context,conversation_chain):
@@ -182,21 +199,35 @@ agent_executor = create_chain_agent()
 #Get the session history
 conversation_chain=get_chat(agent_executor)
 
-def generate_response(message_body,wa_id,name):
+def query_pgvector(conn, table_name, query, k=4):
+    """ Consulta vectores utilizando pgvector para obtener documentos relevantes. """
+    embeddings = OpenAIEmbeddings()
+    query_vector = embeddings.embed_query(query)
+    query_vector_str = ','.join(map(str, query_vector))
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT content FROM {table_name} ORDER BY vector <-> %s::vector LIMIT %s;
+        """.format(table_name=table_name), (f'[{query_vector_str}]', k))
+        results = cursor.fetchall()
+    return [result[0] for result in results]
+
+def generate_response(message_body, wa_id, name):
+    """ Generates a response using the chat model and stores the conversation in the database. """
 
 
-    #Create retriever
-    retriever=db.as_retriever(k=4)
-    context=retriever.invoke(message_body)
+    conn = get_db_connection()
+    context = query_pgvector(conn, "menu_magdalena_rooftop", message_body)
+    conn.close()
 
-    #Delete messages if they exceed the conversation limit
-    #conversation_chain_with_trimming=(RunnablePassthrough.assign(messages_trimmed=trim_messages) | conversation_chain)
 
-    #Create response
-    response_message=run_chain(message_body,wa_id,context,conversation_chain)
+    response_message = conversation_chain.invoke({
+        "input": message_body,
+        "context": context
+    }, {"configurable": {"session_id": wa_id}})
 
-    return response_message
+    # Store the received message and the generated response in the database
+    store_message(wa_id, message_body, response_message.content)
 
-#response=generate_response("me llamo Pablo","123","Pablo")
-#print(get_session_history("123"))
+    logging.info(f"Generated message: {response_message.content}")
+    return response_message.content
 
