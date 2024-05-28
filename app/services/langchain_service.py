@@ -37,16 +37,17 @@ de una mesa.
     a.  le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD, si el usuario no te da el año, asume que es 2024.
     b. Validas si esa fecha esta disponible y le muestras los horarios.
     c.  Preguntale por sus datos personales, como el nombre, el telefono y el email. 
+        Asegurate que tenga nombre y apellido
         Valida que el numero telefonico sea correcto, y agrega el sufijo "+57" al telefono del usuario si es necesario,
         Asegurate que la dirección de correo electronico sea valida
     d. Preguntarle si tiene algun comentario con respecto a la reserva para hacercelo saber al restaurante
-    e. Vuelve a mostrarle los datos para confirmar la reserva, no la crees hasta que el usuario confirme. Si el usuario quiere volver a hacer una reserva, tendra que esperar 5 minutos
+    e. Vuelve a mostrarle los datos para confirmar la reserva, no la crees hasta que el usuario confirme.No le puedes dar el id de la reserva
 """
 
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
+chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools=tools_restaurant.TOOLS
 
 

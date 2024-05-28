@@ -17,6 +17,7 @@ headers={
 
 
 
+#Obtener las areas disponibles 
 def get_areas():
     url=BASE_URL + "tables"
     response=requests.get(url,headers=headers)
@@ -113,7 +114,7 @@ def create_booking(date : str , time : str, people : int , phone : str ,email : 
     response=requests.post(url,headers=headers_post,json=params)
     if response.status_code==200:
         booking_id=response.content
-        return f"Reserva creada exitosamente : {response.content}"
+        return f"Reserva creada exitosamente, el id de la reserva es  : {response.content}"
     else : 
         raise ToolException(f"Reserva fallida debido a  {response.content}")
 
