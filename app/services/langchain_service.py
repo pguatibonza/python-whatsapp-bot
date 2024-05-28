@@ -20,32 +20,32 @@ from . import tools_restaurant
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-chat = ChatOpenAI(model="gpt-4o", temperature=0.2)
+chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools=tools_restaurant.TOOLS
 
 # Plantilla del sistema
 SYSTEM_TEMPLATE = """
 Eres un chatbot de asistencia al cliente para el restaurante ROOFTOP magdalena
 
-Una de tus funciones sera responder cualquier duda que tenga el cliente 
-respecto al menu del restaurante. Para ello podras usar el contexto que está abajo.
-<context>
-{context}
-</context>
-
-Por otro lado, tambien tendras a la mano 2 funciones, una para validar los horarios disponibles dada una fecha y una cantidad de personas, y otra para hacer la reserva
+Tendras 2 funciones principales, una para validar los horarios disponibles dada una fecha y una cantidad de personas, y otra para hacer la reserva
 de una mesa. 
 
 1. Obtener los horarios disponibles para hacer reservas dada una fecha y una cantidad de personas
-2. hacer una reserva. Cuando el usuario tenga que hacer una reserva vas a seguir los siguientes pasos :
-    a.  le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD, si el usuario no te da el año, asume que es 2024.
+2. Hacer una reserva. Cuando el usuario tenga que hacer una reserva vas a seguir los siguientes pasos :
+    a.  le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD. Si el usuario no te da el año, asume que es 2024.
     b. Validas si esa fecha esta disponible y le muestras los horarios.
     c.  Preguntale por sus datos personales, como el nombre, el telefono y el email. 
-        Asegurate que tenga nombre y apellido
+        Asegurate que el usuario escriba su nombre y apellido
         Valida que el numero telefonico sea correcto, y agrega el sufijo "+57" al telefono del usuario si es necesario,
         Asegurate que la dirección de correo electronico sea valida
     d. Preguntarle si tiene algun comentario con respecto a la reserva para hacercelo saber al restaurante
     e. Vuelve a mostrarle los datos para confirmar la reserva, no la crees hasta que el usuario confirme.No le puedes dar el id de la reserva
+
+La otra de tus funciones sera responder cualquier duda que tenga el cliente 
+respecto al menu del restaurante. Para ello podras usar el contexto que está abajo.
+<context>
+{context}
+</context>
 """
 
 def get_db_connection():
@@ -118,7 +118,7 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
         records = cursor.fetchall()
         for record in records:
             # Combine message and response into one string or adjust as necessary
-            combined_message = f"User: {record[0]}, Bot: {record[1]}"
+            combined_message = f"User: {record[0]},{record[1]}"
             history.add_message(combined_message)  # Adjusted to pass one parameter
     conn.close()
 
@@ -219,17 +219,16 @@ def generate_response(message_body, wa_id, name):
 
     conn = get_db_connection()
     context = query_pgvector(conn, "menu_magdalena_rooftop", message_body)
+    print(context)
+    print(len(context))
     conn.close()
 
+    message= run_chain(message_body,wa_id,"",conversation_chain)
 
-    response_message = conversation_chain.invoke({
-        "input": message_body,
-        "context": context
-    }, {"configurable": {"session_id": wa_id}})
 
     # Store the received message and the generated response in the database
-    store_message(wa_id, message_body, response_message.content)
+    store_message(wa_id, message_body, message)
 
-    logging.info(f"Generated message: {response_message.content}")
-    return response_message.content
+    logging.info(f"Generated message: {message}")
+    return message
 

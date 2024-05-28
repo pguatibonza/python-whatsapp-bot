@@ -12,3 +12,4 @@ pdf2image
 pdfminer
 pdfminer.six
 opencv-python
+psycopg2
