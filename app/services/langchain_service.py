@@ -4,6 +4,10 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 import psycopg2
+from langchain_community.document_loaders import UnstructuredPDFLoader
+from langchain_community.document_loaders import PDFMinerLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
@@ -21,9 +25,7 @@ tools=tools_restaurant.TOOLS
 
 # Plantilla del sistema
 SYSTEM_TEMPLATE = """
-Answer the user's questions based on the below context. 
-If the context doesn't contain any relevant information to the question, don't make something up and just say "I don't know":
->>>>>>> persistent_db
+Eres un chatbot de asistencia al cliente para el restaurante ROOFTOP magdalena
 
 Una de tus funciones sera responder cualquier duda que tenga el cliente 
 respecto al menu del restaurante. Para ello podras usar el contexto que está abajo.
