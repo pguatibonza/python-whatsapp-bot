@@ -11,6 +11,8 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain_community.chat_message_histories import RedisChatMessageHistory
+
 import logging
 import os
 
@@ -20,8 +22,10 @@ from . import tools_restaurant
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+REDIS_URL=os.getenv("REDIS_URL")
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools=tools_restaurant.TOOLS
+
 
 # Plantilla del sistema
 SYSTEM_TEMPLATE = """
@@ -109,25 +113,17 @@ store = {}
 #Gets the chat history based on the cellphone number (id)
 #For production use cases, you will want to use a persistent implementation of chat message history, such as RedisChatMessageHistory
 
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    """ Fetches or initializes chat message history for a given session ID. """
-    conn = get_db_connection()
-    history = ChatMessageHistory()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT message, response FROM conversations WHERE phone_number = %s ORDER BY timestamp DESC", (session_id,))
-        records = cursor.fetchall()
-        for record in records:
-            # Combine message and response into one string or adjust as necessary
-            combined_message = f"User: {record[0]},{record[1]}"
-            history.add_message(combined_message)  # Adjusted to pass one parameter
-    conn.close()
+def get_session_history_local(session_id: str) -> BaseChatMessageHistory:
+    """Fetch the chat history"""
+    if session_id not in store:
+        store[session_id] = ChatMessageHistory()
+    return store[session_id]
 
-    if not records:
-        logging.info(f"Creating new session history for {session_id}")
-    else:
-        logging.info(f"Session history for {session_id} retrieved with {len(records)} messages")
-    
-    return history
+
+def get_session_history(session_id: str) -> RedisChatMessageHistory:
+    return RedisChatMessageHistory(session_id, url=REDIS_URL)
+
+
 
 
 

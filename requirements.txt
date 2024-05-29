@@ -13,3 +13,4 @@ pdfminer
 pdfminer.six
 opencv-python
 psycopg2
+redis
