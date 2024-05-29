@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_community.chat_message_histories import RedisChatMessageHistory
-
+from langchain_core.runnables import RunnablePassthrough
 import logging
 import os
 
@@ -119,12 +119,9 @@ def get_session_history_local(session_id: str) -> BaseChatMessageHistory:
         store[session_id] = ChatMessageHistory()
     return store[session_id]
 
-
+#Production use case
 def get_session_history(session_id: str) -> RedisChatMessageHistory:
     return RedisChatMessageHistory(session_id, url=REDIS_URL)
-
-
-
 
 
 
@@ -177,25 +174,26 @@ def run_chain(message_body,wa_id,context,conversation_chain):
     logging.info(f"Generated message :  {message['output']}")
     return message['output']
 
-#Delete messages from the database
-def trim_messages(chain_input,wa_id,conversation_limit=4):
+#Delete messages from the message history
 
-    stored_messages = store[wa_id].messages
-    if len(stored_messages) <= conversation_limit:
-        return False
+def trim_messages(messages,conversation_limit=4):
+    if len(messages)>conversation_limit:
+        return messages[-conversation_limit:]
+    return messages
 
-    store[wa_id].clear()
-
-    for message in stored_messages[-conversation_limit:]:
-        store[wa_id].add_message(message)
-    return True
+##TODO : trim messages based on tokens, not messages
 
 
 #Create chain
 agent_executor = create_chain_agent()
 
+#Create chain with trimming
+agent_executor_with_message_trimming=(RunnablePassthrough.assign(chat_history=lambda x :trim_messages(x["chat_history"]))
+ | agent_executor
+)
+
 #Get the session history
-conversation_chain=get_chat(agent_executor)
+conversation_chain=get_chat(agent_executor_with_message_trimming)
 
 def query_pgvector(conn, table_name, query, k=4):
     """ Consulta vectores utilizando pgvector para obtener documentos relevantes. """
