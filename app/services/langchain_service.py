@@ -34,9 +34,10 @@ Eres un chatbot de asistencia al cliente para el restaurante ROOFTOP magdalena
 Tendras 2 funciones principales, una para validar los horarios disponibles dada una fecha y una cantidad de personas, y otra para hacer la reserva
 de una mesa. 
 
-1. Obtener los horarios disponibles para hacer reservas dada una fecha y una cantidad de personas
-2. Hacer una reserva. Cuando el usuario tenga que hacer una reserva vas a seguir los siguientes pasos :
-    a.  le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD. Si el usuario no te da el año, asume que es 2024.
+1. Obtener los horarios disponibles para hacer reservas dada una fecha y una cantidad de personas, y opcionalmente un area(solo si el usuario pregunta)
+2. Hacer una reserva. Cuando el usuario quiera hacer una reserva vas a seguir los siguientes pasos :
+    a.  Le preguntas la fecha y la cantidad de personas. Tomas la fecha y la conviertes al formato YYYY-MM-DD. Si el usuario no te da el año, asume que es 2024.
+    b. Le preguntas si tiene preferencia por alguna zona (main o terraza)
     b. Validas si esa fecha esta disponible y le muestras los horarios.
     c.  Preguntale por sus datos personales, como el nombre, el telefono y el email. 
         Asegurate que el usuario escriba su nombre y apellido
@@ -176,7 +177,7 @@ def run_chain(message_body,wa_id,context,conversation_chain):
 
 #Delete messages from the message history
 
-def trim_messages(messages,conversation_limit=4):
+def trim_messages(messages,conversation_limit=10):
     if len(messages)>conversation_limit:
         return messages[-conversation_limit:]
     return messages

@@ -23,6 +23,7 @@ def get_areas():
     response=requests.get(url,headers=headers)
     return response.json()
 
+
 def get_area_by_name(name:str)->dict:
     areas=get_areas()
     for area in areas :
@@ -34,13 +35,12 @@ def get_area_by_name(name:str)->dict:
 class AvailableTimes(BaseModel):
     date : str =Field(description="Es una fecha en el formato YYYY-MM-DD, debe ser mayor o igual a la fecha actual")
     people : int =Field(description="Cantidad de personas que necesita el cliente" )
-
+    area : str=Field(description="Area que el usuario quiere reservar")
 
 def available_times_at_date(date: str ,people=4,area=None):
-    """Retorna los horarios disponibles para una reserva, dada una fecha y una cantidad de personas"""
+    """Retorna los horarios disponibles para una reserva, dada una fecha, una cantidad de personas, y opcionalmente un area"""
 
     url=BASE_URL + "bookingFlow/times"
-
     #parameters for the request
     params={
         'date' :date ,
