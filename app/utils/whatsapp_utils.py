@@ -77,7 +77,7 @@ def process_text_for_whatsapp(text):
 
 def process_whatsapp_message(body):
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
+    #name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
     message_body = message["text"]["body"]
@@ -86,7 +86,7 @@ def process_whatsapp_message(body):
     #response = generate_response(message_body)
 
     # OpenAI and Langchain Integration
-    response = generate_response(message_body, wa_id, name)
+    response = generate_response(message_body, wa_id)
     response = process_text_for_whatsapp(response)
 
     data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)

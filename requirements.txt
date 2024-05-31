@@ -14,3 +14,6 @@ pdfminer.six
 opencv-python
 psycopg2
 redis
+supabase
+langgraph
+langsmith

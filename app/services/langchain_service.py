@@ -36,6 +36,8 @@ vector_store = SupabaseVectorStore(client=supabase, table_name="menu_magdalena_r
 
 # Plantilla del sistema
 SYSTEM_TEMPLATE = """
+
+
 Eres un chatbot de asistencia al cliente para el restaurante ROOFTOP magdalena
 
 Tendras 2 funciones principales, una para validar los horarios disponibles dada una fecha y una cantidad de personas, y otra para hacer la reserva
@@ -60,22 +62,14 @@ respecto al menu del restaurante. Para ello podras usar el contexto que está ab
 </context>
 """
 
-def get_db_connection():
-    """ Establece conexión con la base de datos PostgreSQL. """
-    return psycopg2.connect(DB_CONNECTION)
+SYSTEM_TEMPLTATE_2= """
+Eres un asistente virtual del concesionario distoyota, que se encargara de brindar informacion sobre los carros que necesite el usuario.
 
-# # No carga bien
-# def upload_file_unstructured_pdf(file_path):
-#     loader = UnstructuredPDFLoader(file_path)
-#     data = loader.load()
-#     return data
-
-# # Mejor, segmenta mejor la info
-# def upload_file_miner(file_path):
-#     loader = PDFMinerLoader(file_path)
-#     data = loader.load()
-#     return data
-
+Te vas a basar en la siguiente información :
+<context>
+{context}
+</context>
+"""
 # # Load pdfs and create text splits
 # def create_from_directory(file_directory):
 #     data = []
@@ -98,17 +92,11 @@ def get_db_connection():
 #     return vector_store
 
 # # db = add_pdfs_from_directory("../../data/")
-# db = add_pdfs_from_directory("data/")
+#db = add_pdfs_from_directory("data/")
 
-store = {}
 
 # Gets the chat history based on the cellphone number (id)
 # For production use cases, you will want to use a persistent implementation of chat message history, such as RedisChatMessageHistory
-def get_session_history_local(session_id: str) -> BaseChatMessageHistory:
-    """Fetch the chat history"""
-    if session_id not in store:
-        store[session_id] = ChatMessageHistory()
-    return store[session_id]
 
 # Production use case
 def get_session_history(session_id: str) -> RedisChatMessageHistory:
@@ -128,17 +116,6 @@ def create_chain_agent():
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
     return agent_executor
 
-def store_message(session_id, message, response):
-    """ Crea y almacena un mensaje en la base de datos """
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO conversations (phone_number, message, response, timestamp)
-            VALUES (%s, %s, %s, NOW())
-        """, (session_id, message, response))
-    conn.commit()
-    conn.close()
-    logging.info(f"Stored message for session {session_id}")
 
 def get_chat(chain):
     """ Configura la cadena con historial de mensajes. """
@@ -171,10 +148,9 @@ agent_executor_with_message_trimming = (RunnablePassthrough.assign(chat_history=
 # Get the session history
 conversation_chain = get_chat(agent_executor_with_message_trimming)
 
-def generate_response(message_body, wa_id, name):
+def generate_response(message_body, wa_id):
     """ Generates a response using the chat model and stores the conversation in the database. """
     context = vector_store.similarity_search(message_body)
     message = run_chain(message_body, wa_id, context, conversation_chain)
-    store_message(wa_id, message_body, message)
     logging.info(f"Generated message: {message}")
     return message
