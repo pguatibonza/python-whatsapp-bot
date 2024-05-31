@@ -2,17 +2,78 @@ import os
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PDFMinerLoader
 from langchain_openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from supabase import create_client, Client
+from langchain_community.vectorstores import SupabaseVectorStore
 import psycopg2
 
+# Cargar variables de entorno
 load_dotenv()
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 
-# --------------------------------------------------------------
-# Creación de la tabla de conversaciones en Supabase
-# --------------------------------------------------------------
+# Crear cliente de Supabase
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+print(f"Supabase client initialized: {supabase}")
 
+# Función para crear la tabla en PostgreSQL si no existe
+def create_pgvector_table(conn, table_name):
+    with conn.cursor() as cursor:
+        cursor.execute(f"""
+            CREATE EXTENSION IF NOT EXISTS vector;
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id SERIAL PRIMARY KEY,
+                content TEXT,
+                metadata JSONB,
+                embedding VECTOR(1536)
+            );
+        """)
+        conn.commit()
+
+# Conectar a PostgreSQL y crear la tabla si no existe
+conn = psycopg2.connect(DB_CONNECTION)
+COLLECTION_NAME = "menu_magdalena_rooftop"
+create_pgvector_table(conn, COLLECTION_NAME)
+
+# Verificar si ya hay documentos en la tabla
+def documents_exist(conn, table_name):
+    with conn.cursor() as cursor:
+        cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+        count = cursor.fetchone()[0]
+    return count > 0
+
+# Verificar si ya hay documentos y cargar si no existen
+if not documents_exist(conn, COLLECTION_NAME):
+    # Cargar los documentos
+    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/MENUMAGDALENAROOFTOP_removed.pdf"))
+    print(f"Loading file from: {file_path}")
+
+    loader = PDFMinerLoader(file_path)
+    documents = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    docs = text_splitter.split_documents(documents)
+
+    embeddings = OpenAIEmbeddings()
+
+    # Insertar los documentos en Supabase utilizando SupabaseVectorStore
+    vector_store = SupabaseVectorStore.from_documents(
+        docs,
+        embeddings,
+        client=supabase,
+        table_name=COLLECTION_NAME,
+        query_name="match_documents"
+    )
+
+    print("Documentos vectorizados e insertados en Supabase con éxito.")
+else:
+    print("Los documentos ya existen en la base de datos, no se realizó una nueva carga.")
+conn.close()
+
+
+
+# Funciones comentadas para la tabla de conversaciones en Supabase
 # def create_conversation_table():
 #     conn = psycopg2.connect(DB_CONNECTION)
 #     with conn.cursor() as cursor:
@@ -53,53 +114,3 @@ DB_CONNECTION = os.getenv("DB_CONNECTION")
 
 # # Crear la tabla de conversaciones
 # create_conversation_table()
-
-# --------------------------------------------------------------
-# Código para cargar documentos y vectorizarlos (comentado)
-# --------------------------------------------------------------
-
-#Ajustar la ruta del archivo PDF
-file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/airbnb-faq.pdf"))
-
-#Verificar si la ruta del archivo es correcta
-print(f"Loading file from: {file_path}")
-
-# Cargar los documentos
-loader = PDFMinerLoader(file_path)
-documents = loader.load()
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)  # Reducir chunk_size y aumentar chunk_overlap
-docs = text_splitter.split_documents(documents)
-
-embeddings = OpenAIEmbeddings()
-
-#Crear una tabla para PGVector
-def create_pgvector_table(conn, table_name):
-    with conn.cursor() as cursor:
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                id SERIAL PRIMARY KEY,
-                content TEXT,
-                vector VECTOR(1536)
-            );
-        """)
-        conn.commit()
-
-def insert_documents(conn, table_name, docs, embeddings):
-    with conn.cursor() as cursor:
-        for doc in docs:
-            vector = embeddings.embed_query(doc.page_content)
-            vector_str = ','.join(map(str, vector))
-            cursor.execute(f"""
-                INSERT INTO {table_name} (content, vector)
-                VALUES (%s, %s::vector);
-            """, (doc.page_content, f'[{vector_str}]'))
-        conn.commit()
-
-#Descomentar estas líneas si necesitas cargar los documentos
-conn = psycopg2.connect(DB_CONNECTION)
-COLLECTION_NAME = "menu_magdalena_rooftop"
-
-# create_pgvector_table(conn, COLLECTION_NAME)
-insert_documents(conn, COLLECTION_NAME, docs, embeddings)
-
-conn.close()
