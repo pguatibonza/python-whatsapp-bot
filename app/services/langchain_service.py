@@ -1,21 +1,20 @@
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_community.document_loaders import UnstructuredPDFLoader, PDFMinerLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import SupabaseVectorStore
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain_core.runnables import RunnablePassthrough
 from supabase import create_client
+from langchain_community.document_loaders import UnstructuredFileLoader
 import logging
 import os
-from langchain_community.document_loaders import DirectoryLoader
+
 from . import tools_restaurant
-from langchain_community.document_loaders import UnstructuredFileLoader
+from . import supabase_service
+
+
 
 # Configuración inicial
 load_dotenv()
@@ -24,6 +23,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+TABLE_NAME = os.getenv("TABLE_NAME")
 
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools = tools_restaurant.TOOLS
@@ -31,7 +31,9 @@ tools = tools_restaurant.TOOLS
 # Crear cliente de Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
-vector_store = SupabaseVectorStore(client=supabase, table_name="menu_magdalena_rooftop", embedding=embeddings)
+vector_store = supabase_service.load_vector_store()
+
+
 
 # Plantilla del sistema
 SYSTEM_TEMPLATE = """
@@ -75,7 +77,7 @@ def create_from_directory(file_directory):
     data=[]
     for file in os.listdir(file_directory):
         path=os.path.join(file_directory,file)
-        loader=PDFMinerLoader(path)
+        loader=UnstructuredFileLoader(path)
         data+=loader.load()
 
         logging.info(f"Documento cargado desde el archivo {path}")
@@ -122,7 +124,7 @@ def get_session_history(session_id: str) -> RedisChatMessageHistory:
 def create_chain_agent():
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", SYSTEM_TEMPLATE),
+            ("system", SYSTEM_TEMPLATE_2),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
