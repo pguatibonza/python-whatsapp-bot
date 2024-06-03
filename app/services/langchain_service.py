@@ -8,6 +8,7 @@ from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain_core.runnables import RunnablePassthrough
 from supabase import create_client
 from langchain_community.document_loaders import UnstructuredFileLoader
+from langsmith.wrappers import wrap_openai
 import logging
 import os
 
@@ -24,6 +25,10 @@ REDIS_URL = os.getenv("REDIS_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TABLE_NAME = os.getenv("TABLE_NAME")
+LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT")
+LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+LANGCHAIN_TRACING_V2=os.getenv("LANGCHAIN_TRACING_V2")
+
 
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools = tools_restaurant.TOOLS
@@ -124,7 +129,7 @@ def get_session_history(session_id: str) -> RedisChatMessageHistory:
 def create_chain_agent():
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", SYSTEM_TEMPLATE_2),
+            ("system", SYSTEM_TEMPLATE),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
