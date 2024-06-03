@@ -7,16 +7,15 @@ from langchain_community.document_loaders import UnstructuredPDFLoader, PDFMiner
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import SupabaseVectorStore
 from dotenv import load_dotenv
-from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain_core.runnables import RunnablePassthrough
 from supabase import create_client
 import logging
 import os
-import psycopg2
-
+from langchain_community.document_loaders import DirectoryLoader
 from . import tools_restaurant
+from langchain_community.document_loaders import UnstructuredFileLoader
 
 # Configuración inicial
 load_dotenv()
@@ -24,7 +23,7 @@ DB_CONNECTION = os.getenv("DB_CONNECTION")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools = tools_restaurant.TOOLS
@@ -62,7 +61,7 @@ respecto al menu del restaurante. Para ello podras usar el contexto que está ab
 </context>
 """
 
-SYSTEM_TEMPLTATE_2= """
+SYSTEM_TEMPLATE_2= """
 Eres un asistente virtual del concesionario distoyota, que se encargara de brindar informacion sobre los carros que necesite el usuario.
 
 Te vas a basar en la siguiente información :
@@ -71,25 +70,42 @@ Te vas a basar en la siguiente información :
 </context>
 """
 # # Load pdfs and create text splits
-# def create_from_directory(file_directory):
-#     data = []
-#     for file in os.listdir(file_directory):
-#         path = os.path.join(file_directory, file)
-#         loader = PDFMinerLoader(path)
-#         data += loader.load()
-#         logging.info(f"Documento cargado desde el archivo {path}")
+def create_from_directory(file_directory):
+    embeddings=OpenAIEmbeddings()
+    data=[]
+    for file in os.listdir(file_directory):
+        path=os.path.join(file_directory,file)
+        loader=PDFMinerLoader(path)
+        data+=loader.load()
 
-#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-#     all_splits = text_splitter.split_documents(data)
-#     logging.info("Documentos spliteados")
-#     return all_splits
+        logging.info(f"Documento cargado desde el archivo {path}")
 
-# # Take a directory and create/add vectors to the vector store
-# def add_pdfs_from_directory(file_directory):
-#     all_splits = create_from_directory(file_directory)
-#     vector_store.add_documents(all_splits)
-#     logging.info("Documentos añadidos")
-#     return vector_store
+    text_splitter=RecursiveCharacterTextSplitter(chunk_size=500,chunk_overlap=100)
+
+    all_splits=text_splitter.split_documents(data)
+
+    logging.info("Documentos spliteados")
+    return all_splits
+
+#Take a directory and create/add vectors to the vector store
+def add_pdfs_from_directory(file_directory):
+    embeddings=OpenAIEmbeddings()
+    try:
+        vector_store=FAISS.load_local("db",embeddings)
+        logging.info("Vector store cargada")
+        all_splits=create_from_directory(file_directory)
+        vector_store.add_documents(all_splits,embeddings)
+        logging.info("Documentos añadidos")
+    except :
+        all_splits=create_from_directory(file_directory)
+        logging.info("Documentos añadidos y creados")
+        vector_store=FAISS.from_documents(all_splits,embeddings)
+        logging.info("Vector store creada")
+    vector_store.save_local("db")
+
+    logging.info("Vector store guardada")
+    return vector_store
+
 
 # # db = add_pdfs_from_directory("../../data/")
 #db = add_pdfs_from_directory("data/")

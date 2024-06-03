@@ -6,13 +6,15 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from supabase import create_client, Client
 from langchain_community.vectorstores import SupabaseVectorStore
 import psycopg2
+import logging
+from langchain_community.document_loaders import DirectoryLoader
 
 # Cargar variables de entorno
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-DB_CONNECTION = os.getenv("DB_CONNECTION")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+TABLE_NAME=os.getenv("TABLE_NAME")
 
 # Crear cliente de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -70,6 +72,27 @@ if not documents_exist(conn, COLLECTION_NAME):
 else:
     print("Los documentos ya existen en la base de datos, no se realizó una nueva carga.")
 conn.close()
+
+def load_directory(directory):
+    #Carga los archivos desde un directorio 
+    loader=DirectoryLoader(directory,show_progress=True)
+    documents=loader.load()
+    logging.info("documentos cargados en langchain")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+    docs = text_splitter.split_documents(documents)
+
+    embeddings = OpenAIEmbeddings()
+    # Insertar los documentos en Supabase utilizando SupabaseVectorStore
+    vector_store = SupabaseVectorStore.from_documents(
+        docs,
+        embeddings,
+        client=supabase,
+        table_name=TABLE_NAME,
+        query_name="match_documents"
+    )
+    logging.info("Documentos insertados correctamente en la base de datos")
+    return vector_store
+
 
 
 
