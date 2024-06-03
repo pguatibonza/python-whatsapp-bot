@@ -80,6 +80,33 @@ Now we have to find the following information on the **App Dashboard**:
 
 > Please note, this is the hardest part of this tutorial.
 
+### Setup chat message history
+For production use cases, you will need to store the message history in a database. We are going to use Redis
+Redis is an open-source in-memory storage, used as a distributed, in-memory key–value database, cache and message broker, with optional durability. Because it holds all data in memory and because of its design, Redis offers low-latency reads and writes, making it particularly suitable for use cases that require a cache. Redis is the most popular NoSQL database, and one of the most popular databases overall.
+
+1. Run the image  :
+```
+docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+```
+
+2. Set the REDIS_URL in the .env file.  In production use cases, you will need to deploy the docker image on a cloud provider
+```
+REDIS_URL = "redis://localhost:6379/0"
+```
+
+### Setup supabase vector store
+We are going to use the supabase vector store .
+https://supabase.com/vector
+
+1.  Create supabase account
+
+2.  Create organization
+
+3. Create project
+
+4.  Go to the SQL editor section and paste the code from supabase_setup.txt
+The code will create a table which store called documents which is going to store all the documents. Create a table for each different customer. 
+The code will also create a function to match documents. This is the same for all the documents
 #### Start your app
 - Make you have a python installation or environment and install the requirements: `pip install -r requirements.txt`
 - Run your Flask app locally by executing [run.py](https://github.com/daveebbelaar/python-whatsapp-bot/blob/main/run.py)
@@ -104,19 +131,7 @@ ngrok http 8000 --domain your-domain.ngrok-free.app
 ```
 8. ngrok will display a URL where your localhost application is exposed to the internet (copy this URL for use with Meta).
 
-### Launch chat message history
-For production use cases, you will need to store the message history in a database. We are going to use Redis
-Redis is an open-source in-memory storage, used as a distributed, in-memory key–value database, cache and message broker, with optional durability. Because it holds all data in memory and because of its design, Redis offers low-latency reads and writes, making it particularly suitable for use cases that require a cache. Redis is the most popular NoSQL database, and one of the most popular databases overall.
 
-1. Run the image  :
-```
-docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
-```
-
-2. Set the REDIS_URL in the .env file.  In production use cases, you will need to deploy the docker image on a cloud provider
-```
-REDIS_URL = "redis://localhost:6379/0"
-```
 #### Integrate WhatsApp
 
 In the Meta App Dashboard, go to WhatsApp > Configuration, then click the Edit button.
