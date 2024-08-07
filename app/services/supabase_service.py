@@ -22,7 +22,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 print(f"Supabase client initialized: {supabase}")
 
 #Crear indice para evitar duplicados
-namespace=f"supabase/{TABLE_NAME}"
+namespace=f"supabaseParra/{TABLE_NAME}"
 record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache.sql")
 
 # # Función para crear la tabla en PostgreSQL si no existe
@@ -78,6 +78,10 @@ record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache
 #     print("Los documentos ya existen en la base de datos, no se realizó una nueva carga.")
 # conn.close()
 
+def clean_data(documents):
+    for document in documents:
+        document.page_content=document.page_content.replace("\u0000","")
+    return documents
 
 #Carga el vector store de la base de datos
 def load_vector_store():
@@ -95,8 +99,9 @@ def load_directory(directory):
     #Carga los archivos desde un directorio 
     loader=DirectoryLoader(directory,show_progress=True)
     documents=loader.load()
+    documents=clean_data(documents)
     logging.info("documentos cargados en langchain")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=200)
     docs = text_splitter.split_documents(documents)
 
     #Obtener la base de datos
@@ -112,9 +117,10 @@ def load_directory(directory):
 def load_file(file_path):
     loader=UnstructuredFileLoader(file_path)
     documents=loader.load()
+    documents=clean_data(documents)
 
     logging.info("Documento cargado en langchain")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=200)
     docs = text_splitter.split_documents(documents)
 
     #Obtener la base de datos
