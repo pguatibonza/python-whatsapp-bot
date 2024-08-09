@@ -15,7 +15,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Literal
 from typing import List
 from typing_extensions import TypedDict
-
+from langchain.tools.retriever import create_retriever_tool
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
@@ -41,37 +41,35 @@ chat = ChatOpenAI(model="gpt-4o", temperature=0)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 vector_store = supabase_service.load_vector_store()
+retriever=vector_store.as_retriever(search_kwargs={"k":4})
 
 memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 
-# Data model
-class RouteQuery(BaseModel):
-    """Route a user query to the most relevant tool."""
+retriever_tool=create_retriever_tool( 
+    retriever, 
+    'retrieve_info',
+    ' Busca y devuelve informacion sobre los vehiculos del concesionario, repuestos e informacion general'
+)
+tools=[retriever_tool]
 
-    datasource: Literal["informacion_general", "test_drive", "otro"] = Field(
-        ...,
-        description="Dado el input de un usuario, rutealo a información general, test drive u otro",
-    )
 
 #LLM with function call
-chat = ChatOpenAI(model="gpt-4o", temperature=0)
-structured_llm_router = chat.with_structured_output(RouteQuery)
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+agent= llm.bind_tools(tools)
 
 #Prompt
-system = """Eres un chatbot del concesionario Parra Arango y eres experto en rutear el input de un usuario a informacion general o test drive
-Informacion general contiene información sobre los vehiculos que maneja el concesionario, asi como repuestos y todo tipo de información que el publico necesita. Usa información general
-para preguntas o inputs relacionados con eso. 
-Test drive cuando el usuario quiera hacer test de un automovil.
-Si el input del usuario no se relaciona con ninguna de las anteriores, usa otro
+system = """Eres un asistente de servicio al cliente del concesionario Parra arango. 
+Debes comunicarte amablemente con el usuario y mantener precisa y concisa la conversación.
+Tambien debes identificar cuando haya una llamda a una herramienta correctamente.
 """
 route_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
-        ("human", "{question}"),
+        ("human", "{input}"),
     ]
 )
 
-question_router=route_prompt | structured_llm_router
+agent_router=route_prompt | agent
 
 ### Retrieval Grader
 llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0)
@@ -99,7 +97,6 @@ grade_prompt = ChatPromptTemplate.from_messages(
 )
 retrieval_grader = grade_prompt | structured_llm_grader
 question = "cual es el precio de la torres supreme 2025"
-retriever=vector_store.as_retriever(search_kwargs={"k":4})
 docs = retriever.invoke(question)
 doc_txt = docs[1].page_content
 print(retrieval_grader.invoke({"question": question, "document": doc_txt}))
@@ -230,25 +227,45 @@ class GraphState(TypedDict):
     question: str
     generation: str
     documents: List[str]
+    messages : Annotated[list, add_messages]
 
 
 ### Nodes
-def retrieve(state):
+def agent(state):
     """
-    Retrieve documents
+    Invokes the agent model to generate a response based on the current state. Given
+    the input, it will decide to use any tool, retrieve info, or keep chatting.
 
     Args:
-        state (dict): The current graph state
+        state (messages): The current state
 
     Returns:
-        state (dict): New key added to state, documents, that contains retrieved documents
+        dict: The updated state with the agent response appended to messages
     """
-    print("---RETRIEVE---")
-    question = state["question"]
+    print("---CALL AGENT---")
+    message=state['messages']
+    response=agent_router.invoke({"input":message})
 
-    # Retrieval
-    documents = retriever.invoke(question)
-    return {"documents": documents, "question": question}
+    return {"messages": [response]}
+
+     
+
+# def retrieve(state):
+#     """
+#     Retrieve documents
+
+#     Args:
+#         state (dict): The current graph state
+
+#     Returns:
+#         state (dict): New key added to state, documents, that contains retrieved documents
+#     """
+#     print("---RETRIEVE---")
+#     question = state["question"]
+
+#     # Retrieval
+#     documents = retriever.invoke(question)
+#     return {"documents": documents, "question": question}
 
 
 def generate(state):
@@ -282,23 +299,19 @@ def grade_documents(state):
     """
 
     print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-    question = state["question"]
-    documents = state["documents"]
+    question = state["messages"][-3].content
+    document = state["messages"][-1].content
 
-    # Score each doc
-    filtered_docs = []
-    for d in documents:
-        score = retrieval_grader.invoke(
-            {"question": question, "document": d.page_content}
-        )
-        grade = score.binary_score
-        if grade == "si":
-            print("---GRADE: DOCUMENT RELEVANT---")
-            filtered_docs.append(d)
-        else:
-            print("---GRADE: DOCUMENT NOT RELEVANT---")
-            continue
-    return {"documents": filtered_docs, "question": question}
+ 
+    score = retrieval_grader.invoke(
+    {"question": question, "document": document}
+    )
+    grade = score.binary_score
+    if grade == "si":
+        print("---GRADE: DOCUMENT RELEVANT---")
+    else:
+        print("---GRADE: DOCUMENT NOT RELEVANT---")
+    return {"documents": [document], "question": question}
 
 
 def transform_query(state):
@@ -326,7 +339,7 @@ def transform_query(state):
 
 def route_question(state):
     """
-    Rutea input a informacion general, test drive u otro.
+    Rutea input a rag, tool  o chatbot.
 
     Args:
         state (dict): The current graph state
@@ -336,18 +349,18 @@ def route_question(state):
     """
 
     print("---ROUTE QUESTION---")
-    question = state["question"]
-    source = question_router.invoke({"question": question})
+    source= state["messages"][-1]
+    
     print(source)
-    if source.datasource == "informacion_general":
-        print("---ROUTE QUESTION TO INFORMACION_GENERAL---")
+    if source.datasource == "rag":
+        print("---ROUTE INPUT TO RAG---")
         return "vectorstore"
-    elif source.datasource == "test_drive":
-        print("---ROUTE QUESTION TO TEST DRIVE---")
+    elif source.datasource == "tool":
+        print("---ROUTE INPUT TO TOOL---")
         return "vectorstore"
-    elif source.datasource== "otro":
-        print("---ROUTE QUESTION TO OTRO---")
-        return "vectorstore"
+    elif source.datasource== "chatbot":
+        print("---ROUTE INPUT TO CHATBOT---")
+        return "agent"
 
 
 
@@ -421,18 +434,21 @@ def grade_generation_v_documents_and_question(state):
 workflow = StateGraph(GraphState)
 
 # Define the nodes
+workflow.add_node("agent",agent)
+retrieve=ToolNode([retriever_tool])
 workflow.add_node("retrieve", retrieve)  # retrieve
 workflow.add_node("grade_documents", grade_documents)  # grade documents
 workflow.add_node("generate", generate)  # generatae
 workflow.add_node("transform_query", transform_query)  # transform_query
 
 # Build graph
+workflow.add_edge(START,"agent")
 workflow.add_conditional_edges(
-    START,
-    route_question,
+    "agent",
+    tools_condition,
     {
-        "vectorstore": "retrieve",
-
+        "tools": "retrieve",
+        END:END
     },
 )
 workflow.add_edge("retrieve", "grade_documents")
