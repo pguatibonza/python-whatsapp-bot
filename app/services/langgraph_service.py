@@ -2,7 +2,6 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from dotenv import load_dotenv
 from supabase import create_client
 from langgraph.checkpoint.sqlite import SqliteSaver
-from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.output_parsers import StrOutputParser
 import logging
 import os
@@ -19,6 +18,7 @@ from langchain.tools.retriever import create_retriever_tool
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 
 from . import tools_restaurant
 from . import supabase_service
@@ -42,7 +42,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 vector_store = supabase_service.load_vector_store()
 retriever=vector_store.as_retriever(search_kwargs={"k":4})
-
 memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 
 retriever_tool=create_retriever_tool( 
@@ -96,10 +95,10 @@ grade_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 retrieval_grader = grade_prompt | structured_llm_grader
-question = "cual es el precio de la torres supreme 2025"
-docs = retriever.invoke(question)
-doc_txt = docs[1].page_content
-print(retrieval_grader.invoke({"question": question, "document": doc_txt}))
+# question = "cual es el precio de la torres supreme 2025"
+# docs = retriever.invoke(question)
+# doc_txt = docs[1].page_content
+# print(retrieval_grader.invoke({"question": question, "document": doc_txt}))
 
 
 ### Generate
@@ -128,11 +127,11 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 # Chain
-rag_chain = prompt | llm | StrOutputParser()
+rag_chain = prompt | llm #| StrOutputParser()
 
-#Run 
-generation = rag_chain.invoke({"context": docs, "question": question})
-print(generation)
+# #Run 
+# generation = rag_chain.invoke({"context": docs, "question": question})
+# print(generation)
 
 ### Hallucination Grader
 
@@ -160,7 +159,7 @@ hallucination_prompt = ChatPromptTemplate.from_messages(
 )
 
 hallucination_grader = hallucination_prompt | structured_llm_grader
-hallucination_grader.invoke({"documents": docs, "generation": generation})
+#hallucination_grader.invoke({"documents": docs, "generation": generation})
 
 ### Answer Grader
 
@@ -189,7 +188,7 @@ answer_prompt = ChatPromptTemplate.from_messages(
 )
 
 answer_grader = answer_prompt | structured_llm_grader
-answer_grader.invoke({"question": question, "generation": generation})
+#answer_grader.invoke({"question": question, "generation": generation})
 
 ### Question Re-writer
 
@@ -197,7 +196,8 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 # Prompt
 system = """Usted es un reformulador de preguntas que convierte una pregunta de entrada en una versión mejorada y optimizada
-para la recuperación de información en un vectorstore. Analice la entrada e intente razonar sobre la intención / significado semántico subyacente."""
+para la recuperación de información en un vectorstore. Analice la entrada e intente razonar sobre la intención / significado semántico subyacente. 
+Tenga en cuenta el historial de mensajes del usuario para completar la pregunta, y mantenga el significado semantico subyacente"""
 re_write_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
@@ -205,11 +205,12 @@ re_write_prompt = ChatPromptTemplate.from_messages(
             "human",
             "Aqui esta la pregunta inicial: \n\n {question} \n Formule una respuesta mejorada.",
         ),
+         ("placeholder","{messages}")
     ]
 )
 
 question_rewriter = re_write_prompt | llm | StrOutputParser()
-question_rewriter.invoke({"question": question})
+#question_rewriter.invoke({"question": question})
 
 
 
@@ -284,7 +285,7 @@ def generate(state):
 
     # RAG generation
     generation = rag_chain.invoke({"context": documents, "question": question})
-    return {"documents": documents, "question": question, "generation": generation}
+    return {"documents": documents, "question": question, "messages": [generation],"generation":generation.content}
 
 
 def grade_documents(state):
@@ -299,7 +300,7 @@ def grade_documents(state):
     """
 
     print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-    question = state["messages"][-3].content
+    question = state["messages"][-3].content #Cambiar posiblemente
     document = state["messages"][-1].content
 
  
@@ -330,37 +331,12 @@ def transform_query(state):
     documents = state["documents"]
 
     # Re-write question
-    better_question = question_rewriter.invoke({"question": question})
+    better_question = question_rewriter.invoke({"question": question,"messages":state["messages"]})
     return {"documents": documents, "question": better_question}
 
 
 ### Edges ###
 
-
-def route_question(state):
-    """
-    Rutea input a rag, tool  o chatbot.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        str: Next node to call
-    """
-
-    print("---ROUTE QUESTION---")
-    source= state["messages"][-1]
-    
-    print(source)
-    if source.datasource == "rag":
-        print("---ROUTE INPUT TO RAG---")
-        return "vectorstore"
-    elif source.datasource == "tool":
-        print("---ROUTE INPUT TO TOOL---")
-        return "vectorstore"
-    elif source.datasource== "chatbot":
-        print("---ROUTE INPUT TO CHATBOT---")
-        return "agent"
 
 
 
@@ -472,4 +448,22 @@ workflow.add_conditional_edges(
 )
 
 # Compile
-app = workflow.compile()
+app = workflow.compile(checkpointer=memory)
+config = {"configurable": {"thread_id": "1"}}
+
+# from pprint import pprint
+
+# Run
+inputs = {
+    "messages": "Cual es el precio de la actyon torres tg 2025?"
+}
+for output in app.stream(inputs,config=config):
+    for key, value in output.items():
+        # Node
+        pprint(f"Node '{key}':")
+        # Optional: print full state at each node
+        pprint(value, indent=2, width=80, depth=None)
+    pprint("\n---\n")
+
+# Final generation
+pprint(value["generation"])
