@@ -19,6 +19,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
+from pprint import pprint
 
 from . import tools_restaurant
 from . import supabase_service
@@ -48,7 +49,8 @@ retriever_tool=create_retriever_tool(
     retriever, 
     'retrieve_info',
     ' Busca y devuelve informacion sobre los vehiculos del concesionario, repuestos e informacion general'
-)
+    ,document_separator="\n\n\n"
+)   
 tools=[retriever_tool]
 
 
@@ -301,18 +303,21 @@ def grade_documents(state):
 
     print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
     question = state["messages"][-3].content #Cambiar posiblemente
-    document = state["messages"][-1].content
+    raw_document = state["messages"][-1].content
 
- 
-    score = retrieval_grader.invoke(
-    {"question": question, "document": document}
-    )
-    grade = score.binary_score
-    if grade == "si":
-        print("---GRADE: DOCUMENT RELEVANT---")
-    else:
-        print("---GRADE: DOCUMENT NOT RELEVANT---")
-    return {"documents": [document], "question": question}
+    documents=raw_document.split("\n\n\n")
+    filtered_documents =[]
+    for document in documents:
+        score = retrieval_grader.invoke(
+        {"question": question, "document": document}
+        )
+        grade = score.binary_score
+        if grade == "si":
+            print("---GRADE: DOCUMENT RELEVANT---")
+            filtered_documents.append(document)
+        else:
+            print("---GRADE: DOCUMENT NOT RELEVANT---")
+    return {"documents": filtered_documents, "question": question}
 
 
 def transform_query(state):
@@ -449,13 +454,13 @@ workflow.add_conditional_edges(
 
 # Compile
 app = workflow.compile(checkpointer=memory)
-config = {"configurable": {"thread_id": "1"}}
+config = {"configurable": {"thread_id": "2"}}
 
 # from pprint import pprint
 
 # Run
 inputs = {
-    "messages": "Cual es el precio de la actyon torres tg 2025?"
+    "messages": "Cual es el precio de la actyon torres tg 2025"
 }
 for output in app.stream(inputs,config=config):
     for key, value in output.items():
