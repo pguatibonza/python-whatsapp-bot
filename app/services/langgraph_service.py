@@ -1,10 +1,9 @@
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.tools.tavily_search import TavilySearchResults
 from dotenv import load_dotenv
 from supabase import create_client
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.output_parsers import StrOutputParser
-import logging
-import os
 from typing import Annotated
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
@@ -20,7 +19,10 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from pprint import pprint
-
+from typing import Any,  Literal, Union
+from langchain_core.messages import  AnyMessage
+import logging
+import os
 from . import tools_restaurant
 from . import supabase_service
 from . import tools_parra
@@ -51,12 +53,16 @@ retriever_tool=create_retriever_tool(
     ' Busca y devuelve informacion sobre los vehiculos del concesionario, repuestos e informacion general'
     ,document_separator="\n\n\n"
 )   
-tools=[retriever_tool]
+
+
+tool = TavilySearchResults(max_results=2)
+tools = [tool]
+llm_tools=[retriever_tool,tool]
 
 
 #LLM with function call
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
-agent= llm.bind_tools(tools)
+agent= llm.bind_tools(llm_tools)
 
 #Prompt
 system = """Eres un asistente de servicio al cliente del concesionario Parra arango. 
@@ -248,6 +254,7 @@ def agent(state):
     print("---CALL AGENT---")
     message=state['messages']
     response=agent_router.invoke({"input":message})
+    
 
     return {"messages": [response]}
 
@@ -302,8 +309,8 @@ def grade_documents(state):
     """
 
     print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-    question = state["messages"][-3].content #Cambiar posiblemente
-    raw_document = state["messages"][-1].content
+    question = state["messages"][-2].tool_calls[0]['args']['query']#penultimo mensaje es el AI message que se manda para la tool call
+    raw_document = state["messages"][-1].content #Ulimo mensaje siempte es lo que devuelve el retrieve tool
 
     documents=raw_document.split("\n\n\n")
     filtered_documents =[]
@@ -337,11 +344,11 @@ def transform_query(state):
 
     # Re-write question
     better_question = question_rewriter.invoke({"question": question,"messages":state["messages"]})
-    return {"documents": documents, "question": better_question}
+    retrieve_call=agent_router.invoke({"input":better_question})
+    return {"documents": documents, "question": better_question,"messages":[retrieve_call]}
 
 
 ### Edges ###
-
 
 
 
@@ -411,6 +418,35 @@ def grade_generation_v_documents_and_question(state):
         print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
         return "not supported"
 
+#Define tool routing
+
+def tools_condition_modified(
+    state: Union[list[AnyMessage], dict[str, Any]],
+) -> Literal["tools", "__end__"]:
+    """Use in the conditional_edge to route to the ToolNode if the last message
+
+    has tool calls. Otherwise, route to the end.
+
+    Args:
+        state (Union[list[AnyMessage], dict[str, Any]]): The state to check for
+            tool calls. Must have a list of messages (MessageGraph) or have the
+            "messages" key (StateGraph).
+
+    Returns:
+        The next node to route to.
+    """
+    if isinstance(state, list):
+        ai_message = state[-1]
+    elif messages := state.get("messages", []):
+        ai_message = messages[-1]
+    else:
+        raise ValueError(f"No messages found in input state to tool_edge: {state}")
+    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        for tool_call in ai_message.tool_calls:
+            if tool_call["name"]=="retrieve_info":
+                return "retrieve"
+        return "tools"
+    return "__end__"
 
 workflow = StateGraph(GraphState)
 
@@ -418,6 +454,8 @@ workflow = StateGraph(GraphState)
 workflow.add_node("agent",agent)
 retrieve=ToolNode([retriever_tool])
 workflow.add_node("retrieve", retrieve)  # retrieve
+tool_node=ToolNode(tools)
+workflow.add_node("tools",tool_node)
 workflow.add_node("grade_documents", grade_documents)  # grade documents
 workflow.add_node("generate", generate)  # generatae
 workflow.add_node("transform_query", transform_query)  # transform_query
@@ -426,12 +464,14 @@ workflow.add_node("transform_query", transform_query)  # transform_query
 workflow.add_edge(START,"agent")
 workflow.add_conditional_edges(
     "agent",
-    tools_condition,
+    tools_condition_modified,
     {
-        "tools": "retrieve",
+        "retrieve": "retrieve",
+        "tools":"tools",
         END:END
     },
 )
+workflow.add_edge("tools","agent")
 workflow.add_edge("retrieve", "grade_documents")
 workflow.add_conditional_edges(
     "grade_documents",
@@ -454,13 +494,13 @@ workflow.add_conditional_edges(
 
 # Compile
 app = workflow.compile(checkpointer=memory)
-config = {"configurable": {"thread_id": "2"}}
+config = {"configurable": {"thread_id": "5"}}
 
 # from pprint import pprint
 
 # Run
 inputs = {
-    "messages": "Cual es el precio de la actyon torres tg 2025"
+    "messages": "Cual es el precio de las tivoli XLV"
 }
 for output in app.stream(inputs,config=config):
     for key, value in output.items():
