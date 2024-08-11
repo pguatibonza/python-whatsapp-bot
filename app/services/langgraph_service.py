@@ -55,9 +55,9 @@ retriever_tool=create_retriever_tool(
 )   
 
 
-tool = TavilySearchResults(max_results=2)
-tools = [tool]
-llm_tools=[retriever_tool,tool]
+web_search_tool = TavilySearchResults(max_results=2)
+tools = [web_search_tool,tools_parra.tool_create_event_test_drive]
+llm_tools=[retriever_tool,web_search_tool,tools_parra.tool_create_event_test_drive]
 
 
 #LLM with function call
@@ -67,7 +67,8 @@ agent= llm.bind_tools(llm_tools)
 #Prompt
 system = """Eres un asistente de servicio al cliente del concesionario Parra arango. 
 Debes comunicarte amablemente con el usuario y mantener precisa y concisa la conversación.
-Tambien debes identificar cuando haya una llamda a una herramienta correctamente.
+Tambien debes identificar cuando haya una llamda a una herramienta correctamente. Si el usuario pide un test drive, 
+recuerda agregar a las fechas el formato UTC, por ejemplo : '2015-05-28T09:00:00-05:00'
 """
 route_prompt = ChatPromptTemplate.from_messages(
     [

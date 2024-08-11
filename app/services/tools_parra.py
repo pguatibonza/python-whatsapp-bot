@@ -24,6 +24,7 @@ def get_calendar_service():
     # Si no hay credenciales válidas disponibles, solicita al usuario que inicie sesión
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
+            print("pp")
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
@@ -40,8 +41,8 @@ class EventTestDrive(BaseModel):
     name : str=Field(description="Es el nombre de quien va a hacer la cita")
     lastname : str=Field(description="Es el apellido de quien va a hacer la cita")
     email : str=Field(description="Es el correo electronico de quien va a hacer la cita")
-    date_begin : str=Field(description="Es la fecha en la cual se hará la cita. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -07:00")
-    date_finish : str=Field(description="Es la fecha en la cual se acaba la cita. Es una hora despues de que empieza. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -07:00" )
+    date_begin : str=Field(description="Es la fecha en la cual se hará la cita. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -05:00. Por ejemplo  :  '2015-05-28T09:00:00-05:00'")
+    date_finish : str=Field(description="Es la fecha en la cual se acaba la cita. Es una hora despues de que empieza. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -05:00. Por ejemplo : '2015-05-28T09:00:00-05:00'" )
     notes : str=Field(description=" Notas adicionales que deja el usuario")
 def create_event_test_drive(car_model : str , name : str, lastname : str, email : str, date_begin :str ,date_finish :str,  notes="" ):
     
