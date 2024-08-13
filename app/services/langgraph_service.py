@@ -21,6 +21,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from pprint import pprint
 from typing import Any,  Literal, Union
 from langchain_core.messages import  AnyMessage
+from langchain.schema import AIMessage
 import logging
 import os
 from . import tools_restaurant
@@ -56,31 +57,60 @@ retriever_tool=create_retriever_tool(
 
 
 web_search_tool = TavilySearchResults(max_results=2)
-tools = [web_search_tool,tools_parra.tool_create_event_test_drive]
-llm_tools=[retriever_tool,web_search_tool,tools_parra.tool_create_event_test_drive]
+tools = [tools_parra.tool_create_event_test_drive]
+llm_tools=[tools_parra.tool_create_event_test_drive]
 
 
 #LLM with function call
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 agent= llm.bind_tools(llm_tools)
 
+
 #Prompt
 system = """Eres un asistente de servicio al cliente del concesionario Parra arango. 
 Debes comunicarte amablemente con el usuario y mantener precisa y concisa la conversación.
-Tambien debes identificar cuando haya una llamda a una herramienta correctamente. Si el usuario pide un test drive, 
-recuerda agregar a las fechas el formato UTC, por ejemplo : '2015-05-28T09:00:00-05:00'
+Tambien debes identificar cuando haya una llamada a una herramienta correctamente. 
+Si el usuario te pregunta sobre vehiculos, repuestos o informacion general del concesionario, responde con ''.
+Si el usuario pide un test drive, 
+recuerda agregar a las fechas el formato UTC(NO SE LO DEBES PREGUNTAR AL USUARIO), por ejemplo : '2015-05-28T09:00:00-05:00'.
 """
-route_prompt = ChatPromptTemplate.from_messages(
+
+prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
         ("human", "{input}"),
     ]
 )
 
-agent_router=route_prompt | agent
+main_agent=prompt | agent
+
+#Router LLM
+#LLM
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# Data model
+class IndexRelated(BaseModel):
+    """Score binario para verificar si hacen consultas sobre el indice."""
+
+    binary_score: str = Field(
+        description="Pregunta esta relacionada con el indice, 'si' o 'no'"
+    )
+structured_llm_router=llm.with_structured_output(IndexRelated)
+
+
+system=""" Eres un experto enrutador que se encargara de decidir si basado en el input del usuario se debe proceder
+a extraer documentos del indice para responder su solicitud. El indice contiene informacion sobre vehiculos, repuestos e informacion general sobre
+el concesionario parra arango. Responde 'si' sí el usuario pregunta por información relacionada"""
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system),
+        ("human", "{input}"),
+    ]
+)
+router=prompt  | structured_llm_router
 
 ### Retrieval Grader
-llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0)
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 # Data model
 class GradeDocuments(BaseModel):
@@ -94,7 +124,9 @@ structured_llm_grader=llm.with_structured_output(GradeDocuments)
 # Prompt
 system = """
 Usted es un evaluador que está valorando la relevancia de un documento recuperado respecto a una pregunta del usuario.
-Si el documento contiene palabra(s) clave o un significado semántico relacionado con la pregunta del usuario, califíquelo como relevante.El objetivo es filtrar recuperaciones erróneas.
+Si el documento contiene palabra(s) clave o un significado semántico relacionado con la pregunta del usuario,califíquelo como relevante.
+Si el documento responde parcial o completamente a la pregunta del usuario, tambien califiquelo como relevante.
+El objetivo es filtrar recuperaciones erróneas.
 Asigne una puntuación binaria 'si' o 'no' para indicar si el documento es relevante para la pregunta.
 """
 grade_prompt = ChatPromptTemplate.from_messages(
@@ -142,62 +174,6 @@ rag_chain = prompt | llm #| StrOutputParser()
 # generation = rag_chain.invoke({"context": docs, "question": question})
 # print(generation)
 
-### Hallucination Grader
-
-# Data model
-class GradeHallucinations(BaseModel):
-    """Binary score for hallucination present in generation answer."""
-
-    binary_score: str = Field(
-        description="Answer is grounded in the facts, 'si' or 'no'"
-    )
-
-
-# LLM with function call
-llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0)
-structured_llm_grader = llm.with_structured_output(GradeHallucinations)
-
-# Prompt
-system = """Usted es un evaluador que está valorando si una generación de LLM está fundamentada en / apoyada por un conjunto de hechos recuperados.
-Asigne una puntuación binaria 'si' o 'no'. 'si' significa que la respuesta está fundamentada en / apoyada por el conjunto de hechos."""
-hallucination_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "Conjunto de hechos: \n\n {documents} \n\n LLM generation: {generation}"),
-    ]
-)
-
-hallucination_grader = hallucination_prompt | structured_llm_grader
-#hallucination_grader.invoke({"documents": docs, "generation": generation})
-
-### Answer Grader
-
-
-# Data model
-class GradeAnswer(BaseModel):
-    """Binary score to assess answer addresses question."""
-
-    binary_score: str = Field(
-        description="Answer addresses the question, 'si' or 'no'"
-    )
-
-
-# LLM with function call
-llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0)
-structured_llm_grader = llm.with_structured_output(GradeAnswer)
-
-# Prompt
-system = """Usted es un evaluador que está valorando si una respuesta aborda / resuelve una pregunta.
-Asigne una puntuación binaria 'si' o 'no'. 'si' significa que la respuesta resuelve la pregunta."""
-answer_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "Pregunta del usuario: \n\n {question} \n\n LLM generation: {generation}"),
-    ]
-)
-
-answer_grader = answer_prompt | structured_llm_grader
-#answer_grader.invoke({"question": question, "generation": generation})
 
 ### Question Re-writer
 
@@ -235,6 +211,7 @@ class GraphState(TypedDict):
     """
 
     question: str
+    user_input:str
     generation: str
     documents: List[str]
     messages : Annotated[list, add_messages]
@@ -254,30 +231,47 @@ def agent(state):
     """
     print("---CALL AGENT---")
     message=state['messages']
-    response=agent_router.invoke({"input":message})
-    
+    response=main_agent.invoke({"input":message})
 
-    return {"messages": [response]}
+    return {"messages": [response],"user_input":message}
 
      
 
-# def retrieve(state):
-#     """
-#     Retrieve documents
+def retrieve(state):
+    """
+    Retrieve documents
 
-#     Args:
-#         state (dict): The current graph state
+    Args:
+        state (dict): The current graph state
 
-#     Returns:
-#         state (dict): New key added to state, documents, that contains retrieved documents
-#     """
-#     print("---RETRIEVE---")
-#     question = state["question"]
+    Returns:
+        state (dict): New key added to state, documents, that contains retrieved documents
+    """
+    print("---RETRIEVE---")
+    question = state["question"]
 
-#     # Retrieval
-#     documents = retriever.invoke(question)
-#     return {"documents": documents, "question": question}
+    # Retrieval
+    documents = retriever.invoke(question)
+    return {"documents": documents, "question": question}
 
+def transform_query(state):
+    """
+    Transform the query to produce a better question.
+
+    Args:
+        state (dict): The current graph state
+
+    Returns:
+        state (dict): Updates question key with a re-phrased question
+    """
+
+    print("---TRANSFORM QUERY---")
+    question = state["user_input"]
+
+    # Re-write question
+    better_question = question_rewriter.invoke({"question": question,"messages":state["messages"]})
+
+    return { "question": better_question}
 
 def generate(state):
     """
@@ -310,10 +304,9 @@ def grade_documents(state):
     """
 
     print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-    question = state["messages"][-2].tool_calls[0]['args']['query']#penultimo mensaje es el AI message que se manda para la tool call
-    raw_document = state["messages"][-1].content #Ulimo mensaje siempte es lo que devuelve el retrieve tool
 
-    documents=raw_document.split("\n\n\n")
+    documents=state["documents"]
+    question=state["question"]
     filtered_documents =[]
     for document in documents:
         score = retrieval_grader.invoke(
@@ -328,96 +321,11 @@ def grade_documents(state):
     return {"documents": filtered_documents, "question": question}
 
 
-def transform_query(state):
-    """
-    Transform the query to produce a better question.
 
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): Updates question key with a re-phrased question
-    """
-
-    print("---TRANSFORM QUERY---")
-    question = state["question"]
-    documents = state["documents"]
-
-    # Re-write question
-    better_question = question_rewriter.invoke({"question": question,"messages":state["messages"]})
-    retrieve_call=agent_router.invoke({"input":better_question})
-    return {"documents": documents, "question": better_question,"messages":[retrieve_call]}
 
 
 ### Edges ###
 
-
-
-def decide_to_generate(state):
-    """
-    Determines whether to generate an answer, or re-generate a question.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        str: Binary decision for next node to call
-    """
-
-    print("---ASSESS GRADED DOCUMENTS---")
-    state["question"]
-    filtered_documents = state["documents"]
-
-    if not filtered_documents:
-        # All documents have been filtered check_relevance
-        # We will re-generate a new query
-        print(
-            "---DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY---"
-        )
-        return "transform_query"
-    else:
-        # We have relevant documents, so generate answer
-        print("---DECISION: GENERATE---")
-        return "generate"
-
-
-def grade_generation_v_documents_and_question(state):
-    """
-    Determines whether the generation is grounded in the document and answers question.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        str: Decision for next node to call
-    """
-
-    print("---CHECK HALLUCINATIONS---")
-    question = state["question"]
-    documents = state["documents"]
-    generation = state["generation"]
-
-    score = hallucination_grader.invoke(
-        {"documents": documents, "generation": generation}
-    )
-    grade = score.binary_score
-
-    # Check hallucination
-    if grade == "si":
-        print("---DECISION: GENERATION IS GROUNDED IN DOCUMENTS---")
-        # Check question-answering
-        print("---GRADE GENERATION vs QUESTION---")
-        score = answer_grader.invoke({"question": question, "generation": generation})
-        grade = score.binary_score
-        if grade == "si":
-            print("---DECISION: GENERATION ADDRESSES QUESTION---")
-            return "useful"
-        else:
-            print("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
-            return "not useful"
-    else:
-        print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
-        return "not supported"
 
 #Define tool routing
 
@@ -442,10 +350,10 @@ def tools_condition_modified(
         ai_message = messages[-1]
     else:
         raise ValueError(f"No messages found in input state to tool_edge: {state}")
+    score=router.invoke(state["user_input"]).binary_score
+    if score=='si':
+        return "retrieve"
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-        for tool_call in ai_message.tool_calls:
-            if tool_call["name"]=="retrieve_info":
-                return "retrieve"
         return "tools"
     return "__end__"
 
@@ -453,7 +361,6 @@ workflow = StateGraph(GraphState)
 
 # Define the nodes
 workflow.add_node("agent",agent)
-retrieve=ToolNode([retriever_tool])
 workflow.add_node("retrieve", retrieve)  # retrieve
 tool_node=ToolNode(tools)
 workflow.add_node("tools",tool_node)
@@ -467,31 +374,17 @@ workflow.add_conditional_edges(
     "agent",
     tools_condition_modified,
     {
-        "retrieve": "retrieve",
+        "retrieve": "transform_query",
         "tools":"tools",
         END:END
     },
 )
 workflow.add_edge("tools","agent")
-workflow.add_edge("retrieve", "grade_documents")
-workflow.add_conditional_edges(
-    "grade_documents",
-    decide_to_generate,
-    {
-        "transform_query": "transform_query",
-        "generate": "generate",
-    },
-)
 workflow.add_edge("transform_query", "retrieve")
-workflow.add_conditional_edges(
-    "generate",
-    grade_generation_v_documents_and_question,
-    {
-        "not supported": "generate",
-        "useful": END,
-        "not useful": "transform_query",
-    },
-)
+workflow.add_edge("retrieve", "grade_documents")
+workflow.add_edge("grade_documents","generate")
+workflow.add_edge("generate", END)
+
 
 # Compile
 app = workflow.compile(checkpointer=memory)
@@ -501,7 +394,7 @@ config = {"configurable": {"thread_id": "5"}}
 
 # Run
 inputs = {
-    "messages": "Cual es el precio de las tivoli XLV"
+    "messages": "Cual es el precio de las tivoli "
 }
 for output in app.stream(inputs,config=config):
     for key, value in output.items():
@@ -511,5 +404,20 @@ for output in app.stream(inputs,config=config):
         pprint(value, indent=2, width=80, depth=None)
     pprint("\n---\n")
 
-# Final generation
-pprint(value["generation"])
+# # Final generation
+# pprint(value["generation"])
+
+def generate_response(message_body,wa_id):
+    config={"configurable": {"thread_id":"11"}}
+    inputs={"messages": message_body}
+    message=" "
+    for output in app.stream(inputs,config=config):
+        for key, value in output.items():
+            pprint(f"Node '{key}':")
+            pprint(value, indent=2, width=80, depth=None)
+            if 'messages' in value:
+                output_message=value["messages"][-1]
+                if isinstance(output_message,AIMessage) and output_message.content!='':
+                    message=output_message.content    
+        pprint("\n---\n")
+    return message

@@ -3,7 +3,8 @@ from flask import current_app, jsonify
 import json
 import requests
 #from app.services.openai_service import generate_response
-from app.services.langchain_service import generate_response
+#from app.services.langchain_service import generate_response
+from app.services.langgraph_service import generate_response
 import re
 
 
