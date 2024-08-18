@@ -22,6 +22,9 @@ from pprint import pprint
 from typing import Any,  Literal, Union
 from langchain_core.messages import  AnyMessage
 from langchain.schema import AIMessage
+from langchain_core.prompts import MessagesPlaceholder
+from langchain_core.runnables import Runnable, RunnableConfig
+from typing import Annotated, Literal, Optional
 import logging
 import os
 from . import tools_restaurant
@@ -40,6 +43,7 @@ LANGCHAIN_TRACING_V2=os.getenv("LANGCHAIN_TRACING_V2")
 
 
 
+
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 # Crear cliente de Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -48,21 +52,15 @@ vector_store = supabase_service.load_vector_store()
 retriever=vector_store.as_retriever(search_kwargs={"k":4})
 memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 
-retriever_tool=create_retriever_tool( 
-    retriever, 
-    'retrieve_info',
-    ' Busca y devuelve informacion sobre los vehiculos del concesionario, repuestos e informacion general'
-    ,document_separator="\n\n\n"
-)   
-
 
 web_search_tool = TavilySearchResults(max_results=2)
-tools = [tools_parra.tool_create_event_test_drive]
-llm_tools=[tools_parra.tool_create_event_test_drive]
+tools = tools_parra.TOOLS + []
+llm_tools=tools_parra.TOOLS + []
+
 
 
 #LLM with function call
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 agent= llm.bind_tools(llm_tools)
 
 
@@ -79,6 +77,8 @@ prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
         ("human", "{input}"),
+        ("placeholder","{messages}"),
+        
     ]
 )
 
@@ -86,7 +86,7 @@ main_agent=prompt | agent
 
 #Router LLM
 #LLM
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
 # Data model
 class IndexRelated(BaseModel):
@@ -110,7 +110,7 @@ prompt = ChatPromptTemplate.from_messages(
 router=prompt  | structured_llm_router
 
 ### Retrieval Grader
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
 # Data model
 class GradeDocuments(BaseModel):
@@ -144,7 +144,7 @@ retrieval_grader = grade_prompt | structured_llm_grader
 
 ### Generate
 #llm 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
 system="""
 Eres un analista experto del concesionario parra-arango cuya funcion es responder preguntas a los clientes.
@@ -177,7 +177,7 @@ rag_chain = prompt | llm #| StrOutputParser()
 
 ### Question Re-writer
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
 # Prompt
 system = """Usted es un reformulador de preguntas que convierte una pregunta de entrada en una versión mejorada y optimizada
@@ -186,11 +186,11 @@ Tenga en cuenta el historial de mensajes del usuario para completar la pregunta,
 re_write_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
+        ("placeholder","{messages}"),
         (
             "human",
             "Aqui esta la pregunta inicial: \n\n {question} \n Formule una respuesta mejorada.",
-        ),
-         ("placeholder","{messages}")
+        )
     ]
 )
 
@@ -200,6 +200,14 @@ question_rewriter = re_write_prompt | llm | StrOutputParser()
 
 
 ###Graph state
+def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
+    """Push or pop the state."""
+    if right is None:
+        return left
+    if right == "pop":
+        return left[:-1]
+    return left + [right]
+
 class GraphState(TypedDict):
     """
     Represents the state of our graph.
@@ -215,6 +223,30 @@ class GraphState(TypedDict):
     generation: str
     documents: List[str]
     messages : Annotated[list, add_messages]
+    dialog_state : Annotated[list[Literal["assistant","rag"]],update_dialog_stack]
+
+class Assistant:
+    def __init__(self, runnable: Runnable):
+        self.runnable = runnable
+
+    def __call__(self, state: GraphState, config: RunnableConfig):
+        while True:
+
+            result = self.runnable.invoke({"input":state["messages"][-1], "messages":state["messages"][:-1]})
+
+            if not result.tool_calls and (
+                not result.content
+                or isinstance(result.content, list)
+                and not result.content[0].get("text")
+            ):
+                messages = state["messages"] + [("user", "Respond with a real output.")]
+                state = {**state, "messages": messages}
+                messages = state["messages"] + [("user", "Respond with a real output.")]
+                state = {**state, "messages": messages}
+            else:
+                break
+        return {"messages": result,"user_input":result.content}
+
 
 
 ### Nodes
@@ -230,10 +262,12 @@ def agent(state):
         dict: The updated state with the agent response appended to messages
     """
     print("---CALL AGENT---")
-    message=state['messages']
-    response=main_agent.invoke({"input":message})
+    
+    message=state['messages'][-1]
+    messages=state['messages'][:-1]
+    response=main_agent.invoke({"input":message,"messages":messages})
 
-    return {"messages": [response],"user_input":message}
+    return {"messages": [response],"user_input":message.content}
 
      
 
@@ -360,7 +394,7 @@ def tools_condition_modified(
 workflow = StateGraph(GraphState)
 
 # Define the nodes
-workflow.add_node("agent",agent)
+workflow.add_node("agent",Assistant(main_agent))
 workflow.add_node("retrieve", retrieve)  # retrieve
 tool_node=ToolNode(tools)
 workflow.add_node("tools",tool_node)
@@ -388,24 +422,11 @@ workflow.add_edge("generate", END)
 
 # Compile
 app = workflow.compile(checkpointer=memory)
-config = {"configurable": {"thread_id": "5"}}
+config = {"configurable": {"thread_id": "6"}}
 
 # from pprint import pprint
 
 # Run
-inputs = {
-    "messages": "Cual es el precio de las tivoli "
-}
-for output in app.stream(inputs,config=config):
-    for key, value in output.items():
-        # Node
-        pprint(f"Node '{key}':")
-        # Optional: print full state at each node
-        pprint(value, indent=2, width=80, depth=None)
-    pprint("\n---\n")
-
-# # Final generation
-# pprint(value["generation"])
 
 def generate_response(message_body,wa_id):
     config={"configurable": {"thread_id":"11"}}
