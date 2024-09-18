@@ -14,7 +14,7 @@ import os
 
 from . import tools_restaurant
 from . import supabase_service
-from . import tools_parra
+from . import tools
 
 
 
@@ -33,7 +33,7 @@ LANGCHAIN_TRACING_V2=os.getenv("LANGCHAIN_TRACING_V2")
 
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 tools = tools_restaurant.TOOLS
-tools=tools_parra.TOOLS
+tools=tools.TOOLS
 
 # Crear cliente de Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)

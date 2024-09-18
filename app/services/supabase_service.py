@@ -8,6 +8,7 @@ from langchain_community.vectorstores import SupabaseVectorStore
 import logging
 from langchain_community.document_loaders import DirectoryLoader, UnstructuredFileLoader
 from langchain.indexes import SQLRecordManager, index
+from langchain_experimental.text_splitter import SemanticChunker
 
 # Cargar variables de entorno
 load_dotenv()
@@ -24,6 +25,8 @@ print(f"Supabase client initialized: {supabase}")
 #Crear indice para evitar duplicados
 namespace=f"supabaseParra/{TABLE_NAME}"
 record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache.sql")
+#Must do when creating the index for the first time
+# record_manager.create_schema()
 
 
 def clean_data(documents):
@@ -49,7 +52,7 @@ def load_directory(directory):
     documents=loader.load()
     documents=clean_data(documents)
     logging.info("documentos cargados en langchain")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=200)
+    text_splitter=SemanticChunker(embeddings)
     docs = text_splitter.split_documents(documents)
 
     #Obtener la base de datos
@@ -68,7 +71,7 @@ def load_file(file_path):
     documents=clean_data(documents)
 
     logging.info("Documento cargado en langchain")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=200)
+    text_splitter = SemanticChunker(embeddings)
     docs = text_splitter.split_documents(documents)
 
     #Obtener la base de datos

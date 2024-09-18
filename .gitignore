@@ -92,3 +92,8 @@ db/
 .db
 
 data/
+
+.pickle
+docs/
+chatbot/
+*.sql

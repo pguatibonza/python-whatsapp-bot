@@ -1,10 +1,11 @@
+from datetime import datetime
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.tools.tavily_search import TavilySearchResults
 from dotenv import load_dotenv
 from supabase import create_client
-from langgraph.checkpoint.sqlite import SqliteSaver
+#from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.output_parsers import StrOutputParser
-from typing import Annotated
+from typing import Annotated, Callable
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -15,7 +16,7 @@ from typing import List
 from typing_extensions import TypedDict
 from langchain.tools.retriever import create_retriever_tool
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from pprint import pprint
@@ -25,11 +26,13 @@ from langchain.schema import AIMessage
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.runnables import Runnable, RunnableConfig
 from typing import Annotated, Literal, Optional
+from langchain_core.messages import ToolMessage
+from langgraph.prebuilt import ToolNode
 import logging
 import os
 from . import tools_restaurant
 from . import supabase_service
-from . import tools_parra
+from . import tools
 
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -50,27 +53,46 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 vector_store = supabase_service.load_vector_store()
 retriever=vector_store.as_retriever(search_kwargs={"k":4})
-memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
+#memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
+memory=MemorySaver()
 
 
-web_search_tool = TavilySearchResults(max_results=2)
-tools = tools_parra.TOOLS + []
-llm_tools=tools_parra.TOOLS + []
+
 
 
 
 #LLM with function call
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-agent= llm.bind_tools(llm_tools)
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm_tools=tools.TOOLS
+agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.toRagAssistant])
 
 
 #Prompt
-system = """Eres un asistente de servicio al cliente del concesionario Parra arango. 
-Debes comunicarte amablemente con el usuario y mantener precisa y concisa la conversación.
-Tambien debes identificar cuando haya una llamada a una herramienta correctamente. 
-Si el usuario te pregunta sobre vehiculos, repuestos o informacion general del concesionario, responde con ''.
-Si el usuario pide un test drive, 
-recuerda agregar a las fechas el formato UTC(NO SE LO DEBES PREGUNTAR AL USUARIO), por ejemplo : '2015-05-28T09:00:00-05:00'.
+
+system="""
+You are a customer support assistant at Los Coches, a car dealership offering a wide range of vehicles. 
+Your role is to assist customers by:
+
+Answering Questions: Provide detailed, accurate, and helpful information about the vehicles available. 
+This includes specifications, features, pricing, availability, and any current promotions or financing options.
+Only the specialized assistant is given the permission to do this for the customer. 
+
+The customer is not aware of the different specialized assistant, so do not mention them; just quietly delegate 
+through function calls. 
+
+Scheduling Appointments: Help customers set up appointments for test drives. 
+Collect necessary information such as their name, email, preferred date and time, and the specific vehicle models they are interested in. If the user want to add comments, let him, but it is optional
+The dates must be in the following format :  YYYY-MM-DDTHH:MM:SS-05:00. Quietly add the UTC format wihtout asking the user.
+Dont show the user the format you are using, only ask day and hour. 
+Make sure the user input fields are in the proper format
+
+Professional Interaction:Communicate in a friendly, professional, and courteous manner. 
+Ensure that all customer inquiries are addressed promptly and thoroughly.
+
+Your goal is to enhance the customer experience by providing excellent service and facilitating their journey towards purchasing a vehicle from Los Coches.
+You must answer in Spanish
+
+Current time = {time}
 """
 
 prompt = ChatPromptTemplate.from_messages(
@@ -80,99 +102,55 @@ prompt = ChatPromptTemplate.from_messages(
         ("placeholder","{messages}"),
         
     ]
-)
+).partial(time=datetime.now())
 
 main_agent=prompt | agent
 
-#Router LLM
-#LLM
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-
-# Data model
-class IndexRelated(BaseModel):
-    """Score binario para verificar si hacen consultas sobre el indice."""
-
-    binary_score: str = Field(
-        description="Pregunta esta relacionada con el indice, 'si' o 'no'"
-    )
-structured_llm_router=llm.with_structured_output(IndexRelated)
 
 
-system=""" Eres un experto enrutador que se encargara de decidir si basado en el input del usuario se debe proceder
-a extraer documentos del indice para responder su solicitud. El indice contiene informacion sobre vehiculos, repuestos e informacion general sobre
-el concesionario parra arango. Responde 'si' sí el usuario pregunta por información relacionada"""
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "{input}"),
-    ]
-)
-router=prompt  | structured_llm_router
-
-### Retrieval Grader
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-
-# Data model
-class GradeDocuments(BaseModel):
-    """Binary score for relevance check on retrieved documents."""
-
-    binary_score: str = Field(
-        description="Documentos son relevante para la pregunta, 'si' o 'no'"
-    )
-structured_llm_grader=llm.with_structured_output(GradeDocuments)
-
-# Prompt
-system = """
-Usted es un evaluador que está valorando la relevancia de un documento recuperado respecto a una pregunta del usuario.
-Si el documento contiene palabra(s) clave o un significado semántico relacionado con la pregunta del usuario,califíquelo como relevante.
-Si el documento responde parcial o completamente a la pregunta del usuario, tambien califiquelo como relevante.
-El objetivo es filtrar recuperaciones erróneas.
-Asigne una puntuación binaria 'si' o 'no' para indicar si el documento es relevante para la pregunta.
-"""
-grade_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
-    ]
-)
-retrieval_grader = grade_prompt | structured_llm_grader
-# question = "cual es el precio de la torres supreme 2025"
-# docs = retriever.invoke(question)
-# doc_txt = docs[1].page_content
-# print(retrieval_grader.invoke({"question": question, "document": doc_txt}))
 
 
 ### Generate
 #llm 
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+llm = ChatOpenAI(model="gpt-4o", temperature=0).bind_tools([tools.CompleteOrEscalate])
 
 system="""
-Eres un analista experto del concesionario parra-arango cuya funcion es responder preguntas a los clientes.
-Usa las siguientes piezas de información contextual para responder la pregunta. Si no conoces la respuesta, di que
-esa información no la tienes disponible.
-Manten una respuesta concisa
-Question: {question} 
+You are a specialized customer support assistant for Los Coches, a car dealership renowned for its wide selection of vehicles. 
+Your main function is to answer any requests customers have about Los Coches and the cars they offer.
 
-Context: {context} 
+Access to Context: You have comprehensive knowledge and access to detailed information about all vehicles in the Los Coches inventory. 
+This includes specifications, features, pricing, availability, customer reviews, and current promotions or financing options. 
+Use the  context provided below to give accurate and helpful responses to customer inquiries.
 
-Answer:"""
+Customer Inquiries: Assist customers with any questions they may have about specific car models, compare different vehicles, 
+provide recommendations based on their preferences and needs, and inform them about additional services offered by Los Coches
+
+If the context provided is not enough to answer the user inquiries, then CompleteOrEscalate
+If the customer changes their mind, escalate the task back to the main assistant.
+If the customer needs help and your function is not appropriate to answer him, then CompleteOrEscalate.
+If the customer input is not about inquiries related to the car dealership, you must CompleteOrEscalate.
+You must answer in Spanish
+Customer request : {user_input}
+
+Context : {context}
+
+time : {time}
+
+"""
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
-        ("human", "{question}"),
+        ("human", "{user_input}"),
+        ("placeholder", "{messages}")
     ]
-)
+).partial(time=datetime.now())
 
 # Post-processing
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 # Chain
-rag_chain = prompt | llm #| StrOutputParser()
-
-# #Run 
-# generation = rag_chain.invoke({"context": docs, "question": question})
-# print(generation)
+rag_agent = prompt | llm 
 
 
 ### Question Re-writer
@@ -200,6 +178,7 @@ question_rewriter = re_write_prompt | llm | StrOutputParser()
 
 
 ###Graph state
+
 def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
     """Push or pop the state."""
     if right is None:
@@ -218,39 +197,33 @@ class GraphState(TypedDict):
         documents: list of documents
     """
 
-    question: str
     user_input:str
-    generation: str
-    documents: List[str]
     messages : Annotated[list, add_messages]
-    dialog_state : Annotated[list[Literal["assistant","rag"]],update_dialog_stack]
-
-class Assistant:
-    def __init__(self, runnable: Runnable):
-        self.runnable = runnable
-
-    def __call__(self, state: GraphState, config: RunnableConfig):
-        while True:
-
-            result = self.runnable.invoke({"input":state["messages"][-1], "messages":state["messages"][:-1]})
-
-            if not result.tool_calls and (
-                not result.content
-                or isinstance(result.content, list)
-                and not result.content[0].get("text")
-            ):
-                messages = state["messages"] + [("user", "Respond with a real output.")]
-                state = {**state, "messages": messages}
-                messages = state["messages"] + [("user", "Respond with a real output.")]
-                state = {**state, "messages": messages}
-            else:
-                break
-        return {"messages": result,"user_input":result.content}
+    dialog_state : Annotated[list[Literal["primary_assistant","rag_assistant"]],update_dialog_stack]
 
 
 
 ### Nodes
-def agent(state):
+
+def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
+    def entry_node(state: GraphState) -> dict:
+        tool_call_id = state["messages"][-1].tool_calls[0]["id"]
+        return {
+            "messages": [
+                ToolMessage(
+                    content=f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user."
+                    f" The user's intent is unsatisfied. Use the provided tools to assist the user. Remember, you are {assistant_name},"
+                    " If the user changes their mind or needs help for other tasks, call the CompleteOrEscalate function to let the primary host assistant take control."
+                    " Do not mention who you are - just act as the proxy for the assistant.",
+                    tool_call_id=tool_call_id,
+                )
+            ],
+            "dialog_state": new_dialog_state,
+        }
+
+    return entry_node
+
+def primary_assistant(state):
     """
     Invokes the agent model to generate a response based on the current state. Given
     the input, it will decide to use any tool, retrieve info, or keep chatting.
@@ -263,96 +236,25 @@ def agent(state):
     """
     print("---CALL AGENT---")
     
-    message=state['messages'][-1]
-    messages=state['messages'][:-1]
-    response=main_agent.invoke({"input":message,"messages":messages})
+    user_input=state['messages'][-1]
+    
+    response=main_agent.invoke({"input":user_input,"messages":state['messages']})
 
-    return {"messages": [response],"user_input":message.content}
+    return {"messages": [response],"user_input":user_input.content}
 
-     
+def rag_assistant(state):
 
-def retrieve(state):
-    """
-    Retrieve documents
+    if state['messages'][-2].tool_calls:
+        user_input=state['messages'][-2].tool_calls[0]['args']['request']
+    else :
+        user_input = state['messages'][-1].content
+     #Extrae contexto segun el query
+    context= retriever.invoke(user_input)
 
-    Args:
-        state (dict): The current graph state
+    #Responde de acuerdo al contexto
+    response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context})
 
-    Returns:
-        state (dict): New key added to state, documents, that contains retrieved documents
-    """
-    print("---RETRIEVE---")
-    question = state["question"]
-
-    # Retrieval
-    documents = retriever.invoke(question)
-    return {"documents": documents, "question": question}
-
-def transform_query(state):
-    """
-    Transform the query to produce a better question.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): Updates question key with a re-phrased question
-    """
-
-    print("---TRANSFORM QUERY---")
-    question = state["user_input"]
-
-    # Re-write question
-    better_question = question_rewriter.invoke({"question": question,"messages":state["messages"]})
-
-    return { "question": better_question}
-
-def generate(state):
-    """
-    Generate answer
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): New key added to state, generation, that contains LLM generation
-    """
-    print("---GENERATE---")
-    question = state["question"]
-    documents = state["documents"]
-
-    # RAG generation
-    generation = rag_chain.invoke({"context": documents, "question": question})
-    return {"documents": documents, "question": question, "messages": [generation],"generation":generation.content}
-
-
-def grade_documents(state):
-    """
-    Determines whether the retrieved documents are relevant to the question.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): Updates documents key with only filtered relevant documents
-    """
-
-    print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-
-    documents=state["documents"]
-    question=state["question"]
-    filtered_documents =[]
-    for document in documents:
-        score = retrieval_grader.invoke(
-        {"question": question, "document": document}
-        )
-        grade = score.binary_score
-        if grade == "si":
-            print("---GRADE: DOCUMENT RELEVANT---")
-            filtered_documents.append(document)
-        else:
-            print("---GRADE: DOCUMENT NOT RELEVANT---")
-    return {"documents": filtered_documents, "question": question}
+    return {"messages": [response]}
 
 
 
@@ -363,62 +265,100 @@ def grade_documents(state):
 
 #Define tool routing
 
-def tools_condition_modified(
-    state: Union[list[AnyMessage], dict[str, Any]],
-) -> Literal["tools", "__end__"]:
-    """Use in the conditional_edge to route to the ToolNode if the last message
 
-    has tool calls. Otherwise, route to the end.
+def route_primary_assistant(
+    state: GraphState,
+) -> Literal[
+    "enter_rag_assistant",
+    "tools",
+    "__end__",
+]:
+    route = tools_condition(state)
+    if route == END:
+        return END
+    tool_calls = state["messages"][-1].tool_calls
+    if tool_calls:
+        if tool_calls[0]["name"] == tools.toRagAssistant.__name__:
+            return "enter_rag_assistant"
+        elif tool_calls[0]["name"] == "create_event_test_drive":
+            return "tools"
+    raise ValueError("Invalid route")
 
-    Args:
-        state (Union[list[AnyMessage], dict[str, Any]]): The state to check for
-            tool calls. Must have a list of messages (MessageGraph) or have the
-            "messages" key (StateGraph).
+def route_to_workflow(
+    state: GraphState,
+) -> Literal[
+    "primary_assistant",
+    "rag_assistant",
+]:
+    """If we are in a delegated state, route directly to the appropriate assistant."""
+    dialog_state = state.get("dialog_state")
+    if not dialog_state:
+        return "primary_assistant"
+    return dialog_state[-1]
 
-    Returns:
-        The next node to route to.
+def route_assistants(
+    state: GraphState,
+) -> Literal[
+    "leave_skill",
+    "__end__",
+]:
+    route = tools_condition(state)
+    if route == END:
+        return END
+    tool_calls = state["messages"][-1].tool_calls
+    did_cancel = any(tc["name"] == tools.CompleteOrEscalate.__name__ for tc in tool_calls)
+    if did_cancel:
+        return "leave_skill"
+
+# This node will be shared for exiting all specialized assistants
+def pop_dialog_state(state: GraphState) -> dict:
+    """Pop the dialog stack and return to the main assistant.
+
+    This lets the full graph explicitly track the dialog flow and delegate control
+    to specific sub-graphs.
     """
-    if isinstance(state, list):
-        ai_message = state[-1]
-    elif messages := state.get("messages", []):
-        ai_message = messages[-1]
-    else:
-        raise ValueError(f"No messages found in input state to tool_edge: {state}")
-    score=router.invoke(state["user_input"]).binary_score
-    if score=='si':
-        return "retrieve"
-    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-        return "tools"
-    return "__end__"
+    messages = []
+    if state["messages"][-1].tool_calls:
+        # Note: Doesn't currently handle the edge case where the llm performs parallel tool calls
+        messages.append(
+            ToolMessage(
+                content="Resuming dialog with the host assistant. Please reflect on the past conversation and assist the student as needed.",
+                tool_call_id=state["messages"][-1].tool_calls[0]["id"],
+            )
+        )
+    return {
+        "dialog_state": "pop",
+        "messages": messages,
+    }
+
+
+
 
 workflow = StateGraph(GraphState)
 
 # Define the nodes
-workflow.add_node("agent",Assistant(main_agent))
-workflow.add_node("retrieve", retrieve)  # retrieve
-tool_node=ToolNode(tools)
-workflow.add_node("tools",tool_node)
-workflow.add_node("grade_documents", grade_documents)  # grade documents
-workflow.add_node("generate", generate)  # generatae
-workflow.add_node("transform_query", transform_query)  # transform_query
+workflow.add_conditional_edges(START,route_to_workflow)
+workflow.add_node("primary_assistant",primary_assistant)
 
-# Build graph
-workflow.add_edge(START,"agent")
+workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "rag_assistant"))  
+workflow.add_node("rag_assistant", rag_assistant)
+workflow.add_edge("enter_rag_assistant","rag_assistant")
+
+workflow.add_node("tools",ToolNode([tools.create_event_test_drive]))
+workflow.add_edge("tools","primary_assistant")
+
 workflow.add_conditional_edges(
-    "agent",
-    tools_condition_modified,
+    "primary_assistant",
+    route_primary_assistant,
     {
-        "retrieve": "transform_query",
-        "tools":"tools",
-        END:END
+        "enter_rag_assistant": "enter_rag_assistant",
+        "tools": "tools",
+        END: END,
     },
 )
-workflow.add_edge("tools","agent")
-workflow.add_edge("transform_query", "retrieve")
-workflow.add_edge("retrieve", "grade_documents")
-workflow.add_edge("grade_documents","generate")
-workflow.add_edge("generate", END)
-
+workflow.add_conditional_edges("rag_assistant", route_assistants)
+workflow.add_node("leave_skill",pop_dialog_state)
+workflow.add_edge("leave_skill", "primary_assistant")
 
 # Compile
 app = workflow.compile(checkpointer=memory)
@@ -429,9 +369,9 @@ config = {"configurable": {"thread_id": "6"}}
 # Run
 
 def generate_response(message_body,wa_id):
-    config={"configurable": {"thread_id":"11"}}
+    config={"configurable": {"thread_id":"696"}}
     inputs={"messages": message_body}
-    message=" "
+    messages_output=[]
     for output in app.stream(inputs,config=config):
         for key, value in output.items():
             pprint(f"Node '{key}':")
@@ -439,6 +379,6 @@ def generate_response(message_body,wa_id):
             if 'messages' in value:
                 output_message=value["messages"][-1]
                 if isinstance(output_message,AIMessage) and output_message.content!='':
-                    message=output_message.content    
+                    messages_output.append(output_message.content)
         pprint("\n---\n")
-    return message
+    return messages_output

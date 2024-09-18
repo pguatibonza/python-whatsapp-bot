@@ -17,3 +17,8 @@ redis
 supabase
 langgraph
 langsmith
+langchain-community
+libmagic
+python-magic
+python-magic-bin
+google_auth_oauthlib

@@ -87,11 +87,12 @@ def process_whatsapp_message(body):
     #response = generate_response(message_body)
 
     # OpenAI and Langchain Integration
-    response = generate_response(message_body, wa_id)
-    response = process_text_for_whatsapp(response)
-
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
-    send_message(data)
+    responses = generate_response(message_body, wa_id)
+    
+    for response in responses:
+        processed_response = process_text_for_whatsapp(response)  # Process the message for WhatsApp formatting
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], processed_response)
+        send_message(data)
 
 
 def is_valid_whatsapp_message(body):

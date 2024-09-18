@@ -2,7 +2,7 @@ import base64
 import requests
 from dotenv import load_dotenv
 import os
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_core.tools import ToolException
 from langchain_openai import ChatOpenAI
