@@ -22,3 +22,7 @@ libmagic
 python-magic
 python-magic-bin
 google_auth_oauthlib
+google-auth 
+google-auth-oauthlib 
+google-auth-httplib2 
+google-api-python-client

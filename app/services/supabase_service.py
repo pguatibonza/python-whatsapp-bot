@@ -23,7 +23,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 print(f"Supabase client initialized: {supabase}")
 
 #Crear indice para evitar duplicados
-namespace=f"supabaseParra/{TABLE_NAME}"
+namespace=f"concesionarios/parra-arango/{TABLE_NAME}"
 record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache.sql")
 #Must do when creating the index for the first time
 # record_manager.create_schema()
@@ -83,3 +83,4 @@ def load_file(file_path):
     return vector_store
 
 
+#load_directory("data/DocumentosParraArango/")
