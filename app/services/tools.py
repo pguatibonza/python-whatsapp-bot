@@ -93,6 +93,8 @@ class toRagAssistant(BaseModel):
     """
     Transfers work to a specialized assistant  to handle any conceptual doubts/inquiries about the vehicles available. 
     This includes specifications, features, pricing, availability, and any current promotions or financing options.
+    Only give information about vehicles Los Coches have, never give information about another brand they don't sell.
+    If general information about car concepts are asked, answer.
     """
     request: str=Field(description="Any necessary follow-up questions the conceptual assistant  should clarify  before proceeding. The request must be related to the  car dealership 'los coches'. ")
 
