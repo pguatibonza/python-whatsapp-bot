@@ -83,4 +83,4 @@ def load_file(file_path):
     return vector_store
 
 
-#load_directory("data/DocumentosParraArango/")
+#load_directory("docs/wagen/")

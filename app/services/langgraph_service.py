@@ -52,7 +52,7 @@ chat = ChatOpenAI(model="gpt-4o", temperature=0)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 vector_store = supabase_service.load_vector_store()
-retriever=vector_store.as_retriever(search_kwargs={"k":4})
+retriever=vector_store.as_retriever(search_kwargs={"k":20})
 #memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 memory=MemorySaver()
 
@@ -120,10 +120,17 @@ Your main function is to answer any requests customers have about Los Coches and
 
 Access to Context: You have comprehensive knowledge and access to detailed information about all vehicles in the Los Coches inventory. 
 This includes specifications, features, pricing, availability, customer reviews, and current promotions or financing options. 
-Use the  context provided below to give accurate and helpful responses to customer inquiries.
+Use the  context provided below to give accurate and helpful responses to customer inquiries. 
+The car Dealership only have 2 brands of cars, Volkswagen and Renault
+You can only answer questions based on the context below.
+
+If the customer has a price target, always recommend a car that is slightly above the price or slightly below. But never quote something way below.
+If customer asks for the best car in the dealership always give the most expensive car available
 
 Customer Inquiries: Assist customers with any questions they may have about specific car models, compare different vehicles, 
-provide recommendations based on their preferences and needs, and inform them about additional services offered by Los Coches
+provide recommendations based on their preferences and needs, and inform them about additional services offered by Los Coches.
+When answering the user, you must first analyze the info and after that give him a summarized, and concise response.
+Only answer with DETAILED explanations if the customer asked for it .
 
 If the context provided is not enough to answer the user inquiries, then CompleteOrEscalate
 If the customer changes their mind, escalate the task back to the main assistant.
@@ -369,7 +376,7 @@ config = {"configurable": {"thread_id": "6"}}
 # Run
 
 def generate_response(message_body,wa_id):
-    config={"configurable": {"thread_id":"696"}}
+    config={"configurable": {"thread_id":"123456789"}}
     inputs={"messages": message_body}
     messages_output=[]
     for output in app.stream(inputs,config=config):
