@@ -26,7 +26,7 @@ from langchain.schema import AIMessage
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.runnables import Runnable, RunnableConfig
 from typing import Annotated, Literal, Optional
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, HumanMessage, RemoveMessage,SystemMessage
 from langgraph.prebuilt import ToolNode
 import logging
 import os
@@ -186,16 +186,16 @@ Tenga en cuenta el historial de mensajes del usuario para completar la pregunta,
 re_write_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system),
+        ("human", "{question}",),
         ("placeholder","{messages}"),
-        (
-            "human",
-            "Aqui esta la pregunta inicial: \n\n {question} \n Formule una respuesta mejorada.",
-        )
     ]
 )
 
 question_rewriter = re_write_prompt | llm | StrOutputParser()
 #question_rewriter.invoke({"question": question})
+
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 
 
@@ -210,18 +210,12 @@ def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
     return left + [right]
 
 class GraphState(TypedDict):
-    """
-    Represents the state of our graph.
 
-    Attributes:
-        question: question
-        generation: LLM generation
-        documents: list of documents
-    """
 
     user_input:str
     messages : Annotated[list, add_messages]
     dialog_state : Annotated[list[Literal["primary_assistant","rag_assistant"]],update_dialog_stack]
+    summary : str
 
 
 
@@ -257,17 +251,23 @@ def primary_assistant(state):
         dict: The updated state with the agent response appended to messages
     """
     print("---CALL AGENT---")
-    
-    user_input=state['messages'][-1]
+    if isinstance(state['messages'][-1],SystemMessage):
+        user_input=state['messages'][-2]
+    else : 
+        user_input=state['messages'][-1]
     
     response=main_agent.invoke({"input":user_input,"messages":state['messages']})
 
     return {"messages": [response],"user_input":user_input.content}
 
 def rag_assistant(state):
-
-    if state['messages'][-2].tool_calls:
+    if isinstance(state['messages'][-1],ToolMessage):
         user_input=state['messages'][-2].tool_calls[0]['args']['request']
+    elif isinstance(state['messages'][-1],SystemMessage):
+        if isinstance(state['messages'][-2],ToolMessage):
+            user_input=state['messages'][-2].tool_calls[0]['args']['request']
+        else : 
+            user_input = state['messages'][-1].content
     else :
         user_input = state['messages'][-1].content
      #Extrae contexto segun el query
@@ -278,7 +278,43 @@ def rag_assistant(state):
 
     return {"messages": [response]}
 
+def get_summary(state: GraphState):
+    summary = state.get("summary", "")
+    if summary:
+        
+        # Add summary to system message
+        system_message = f"Summary of conversation earlier: {summary}"
 
+        messages=[SystemMessage(content=system_message)] + state['messages']
+
+        
+    else:
+        messages = state["messages"]
+    
+    return {"messages": messages}
+
+def summarize_conversation(state: GraphState):
+    # First, we get any existing summary
+    summary = state.get("summary", "")
+    # Create our summarization prompt 
+    if summary:
+        
+        # A summary already exists
+        summary_message = (
+            f"This is summary of the conversation to date: {summary}\n\n"
+            "Extend the summary by taking into account the new messages above:"
+        )  
+    else:
+        summary_message = "Create a summary of the conversation above:"
+
+    # Add prompt to our history
+    messages = state["messages"] + [HumanMessage(content=summary_message)]
+    response = llm.invoke(messages)
+    
+
+    # Delete all but the 3 most recent messages
+    delete_messages = [RemoveMessage(id=m.id) for m in state["messages"][:-2]]
+    return {"summary": response.content, "messages": delete_messages}
 
 
 
@@ -286,6 +322,18 @@ def rag_assistant(state):
 
 
 #Define tool routing
+def should_summarize(state:GraphState):
+        
+    """Return the next node to execute."""
+    
+    messages = state["messages"]
+    
+    # If there are more than six messages, then we summarize the conversation
+    if len(messages) > 10:
+        return "summarize_conversation"
+    
+    # Otherwise we can just end
+    return END
 
 
 def route_primary_assistant(
@@ -293,11 +341,13 @@ def route_primary_assistant(
 ) -> Literal[
     "enter_rag_assistant",
     "tools",
+    "summarize_conversation"
     "__end__",
 ]:
     route = tools_condition(state)
     if route == END:
-        return END
+        summarize=should_summarize(state)
+        return summarize
     tool_calls = state["messages"][-1].tool_calls
     if tool_calls:
         if tool_calls[0]["name"] == tools.toRagAssistant.__name__:
@@ -322,15 +372,18 @@ def route_assistants(
     state: GraphState,
 ) -> Literal[
     "leave_skill",
+    "summarize_conversation",
     "__end__",
 ]:
     route = tools_condition(state)
     if route == END:
-        return END
+        summarize=should_summarize(state)
+        return summarize
     tool_calls = state["messages"][-1].tool_calls
     did_cancel = any(tc["name"] == tools.CompleteOrEscalate.__name__ for tc in tool_calls)
     if did_cancel:
         return "leave_skill"
+    
 
 # This node will be shared for exiting all specialized assistants
 def pop_dialog_state(state: GraphState) -> dict:
@@ -359,7 +412,11 @@ def pop_dialog_state(state: GraphState) -> dict:
 workflow = StateGraph(GraphState)
 
 # Define the nodes
-workflow.add_conditional_edges(START,route_to_workflow)
+workflow.add_node("get_summary", get_summary)
+
+workflow.add_edge(START,"get_summary")
+workflow.add_conditional_edges("get_summary",route_to_workflow)
+
 workflow.add_node("primary_assistant",primary_assistant)
 
 workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "rag_assistant"))  
@@ -375,12 +432,16 @@ workflow.add_conditional_edges(
     {
         "enter_rag_assistant": "enter_rag_assistant",
         "tools": "tools",
+        "summarize_conversation":"summarize_conversation",
         END: END,
     },
 )
 workflow.add_conditional_edges("rag_assistant", route_assistants)
 workflow.add_node("leave_skill",pop_dialog_state)
 workflow.add_edge("leave_skill", "primary_assistant")
+
+workflow.add_node("summarize_conversation",summarize_conversation)
+workflow.add_edge("summarize_conversation",END)
 
 # Compile
 app = workflow.compile(checkpointer=memory)
