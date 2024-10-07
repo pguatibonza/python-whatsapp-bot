@@ -33,7 +33,7 @@ import os
 from . import tools_restaurant
 from . import supabase_service
 from . import tools
-from .prompts import PRIMARY_ASSISTANT_PROMPT,RAG_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
+from .prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
 
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -87,7 +87,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0).bind_tools([tools.CompleteOrEsca
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", RAG_ASSISTANT_PROMPT),
+        ("system", CONTEXTUAL_ASSISTANT_PROMPT),
         ("human", "{user_input}"),
         ("placeholder", "{messages}")
     ]
@@ -168,7 +168,7 @@ def primary_assistant(state):
     Returns:
         dict: The updated state with the agent response appended to messages
     """
-    
+
     user_input=state["user_input"]
     
     response=main_agent.invoke({"input":user_input,"messages":state['messages']})
