@@ -33,7 +33,7 @@ import os
 from . import tools_restaurant
 from . import supabase_service
 from . import tools
-from prompts import PRIMARY_ASSISTANT_PROMPT,RAG_ASSISTANT_PROMPT
+from .prompts import PRIMARY_ASSISTANT_PROMPT,RAG_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
 
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -93,8 +93,6 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(time=datetime.now())
 
-
-# Chain
 rag_agent = prompt | llm 
 
 
@@ -103,28 +101,20 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-### Question Re-writer
-
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-
-# Prompt
-system = """Usted es un reformulador de preguntas que convierte una pregunta de entrada en una versión mejorada y optimizada
-para la recuperación de información en un vectorstore. Analice la entrada e intente razonar sobre la intención / significado semántico subyacente. 
-Tenga en cuenta el historial de mensajes del usuario para completar la pregunta, y mantenga el significado semantico subyacente"""
-re_write_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "{question}",),
-        ("placeholder","{messages}"),
-    ]
-)
-
-question_rewriter = re_write_prompt | llm | StrOutputParser()
-#question_rewriter.invoke({"question": question})
-
+### Context Router
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", QUERY_IDENTIFIER_PROMPT),
+        ("human", "{user_input}"),
+        ("placeholder", "{messages}")
+    ]
+)
+
+
+context_router = prompt | llm.with_structured_output(tools.QueryIdentifier)
 
 
 ###Graph state
@@ -178,30 +168,28 @@ def primary_assistant(state):
     Returns:
         dict: The updated state with the agent response appended to messages
     """
-    print("---CALL AGENT---")
-    if isinstance(state['messages'][-1],SystemMessage):
-        user_input=state['messages'][-2]
-    else : 
-        user_input=state['messages'][-1]
+    
+    user_input=state["user_input"]
     
     response=main_agent.invoke({"input":user_input,"messages":state['messages']})
 
-    return {"messages": [response],"user_input":user_input.content}
+    return {"messages": [response],"user_input":user_input}
 
 def rag_assistant(state):
-    if isinstance(state['messages'][-1],ToolMessage):
-        user_input=state['messages'][-2].tool_calls[0]['args']['request']
-    elif isinstance(state['messages'][-1],SystemMessage):
-        if isinstance(state['messages'][-2],ToolMessage):
-            user_input=state['messages'][-2].tool_calls[0]['args']['request']
-        else : 
-            user_input = state['messages'][-1].content
-    else :
-        user_input = state['messages'][-1].content
-     #Extrae contexto segun el query
-    context= retriever.invoke(user_input)
 
-    #Responde de acuerdo al contexto
+    user_input=state["user_input"]
+    response=context_router.invoke({"user_input":user_input,"messages":state["messages"]})
+
+    context=""
+    #Si el user input necesia extraer info de la base de datos
+    if response.database : 
+        #Si el user input es suficiente para meterlo a la bd
+        if response.sufficient : 
+            context=retriever.invoke(response.query)
+        # Si no, pregunta una follow-up question
+        else : 
+            return {"messages":[AIMessage(content=response.follow_up)]}
+    
     response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context})
 
     return {"messages": [response]}
@@ -381,7 +369,7 @@ config = {"configurable": {"thread_id": "6"}}
 
 def generate_response(message_body,wa_id):
     config={"configurable": {"thread_id":"1111113"}}
-    inputs={"messages": message_body}
+    inputs={"messages": message_body, "user_input": message_body}
     messages_output=[]
     for output in app.stream(inputs,config=config):
         for key, value in output.items():
