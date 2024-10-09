@@ -103,9 +103,6 @@ class QueryIdentifier(BaseModel):
     it identifies if the user input is sufficient to search in the database. If not, then a follow-up question is asked"""
 
     database : bool = Field(description='True if the model needs to extract info from the vector database')
-    sufficient : bool = Field(description='True if the user input is sufficient to enter into the vectorstore')
     query : str = Field(description=' query that is going to enter into the vector store to retrieve the information the user needs')
-    follow_up : str = Field(description='Follow up question to ask the user if the input he provided is not enough to retrieve from the database')
-    
 TOOLS=[tool_create_event_test_drive,toRagAssistant,CompleteOrEscalate]
 

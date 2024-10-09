@@ -141,17 +141,19 @@ class GraphState(TypedDict):
 
 def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
     def entry_node(state: GraphState) -> dict:
-        tool_call_id = state["messages"][-1].tool_calls[0]["id"]
+        messages=[]
+        for tool_call in state["messages"][-1].tool_calls:
+            tool_call_id = tool_call["id"]
+            message =ToolMessage(
+                        content=f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user."
+                        f" The user's intent is unsatisfied. Use the provided tools to assist the user. Remember, you are {assistant_name},"
+                        " If the user changes their mind or needs help for other tasks, call the CompleteOrEscalate function to let the primary host assistant take control."
+                        " Do not mention who you are - just act as the proxy for the assistant.",
+                        tool_call_id=tool_call_id,
+                    )
+            messages.append(message)
         return {
-            "messages": [
-                ToolMessage(
-                    content=f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user."
-                    f" The user's intent is unsatisfied. Use the provided tools to assist the user. Remember, you are {assistant_name},"
-                    " If the user changes their mind or needs help for other tasks, call the CompleteOrEscalate function to let the primary host assistant take control."
-                    " Do not mention who you are - just act as the proxy for the assistant.",
-                    tool_call_id=tool_call_id,
-                )
-            ],
+            "messages" : messages,
             "dialog_state": new_dialog_state,
         }
 
@@ -183,13 +185,8 @@ def rag_assistant(state):
     context=""
     #Si el user input necesia extraer info de la base de datos
     if response.database : 
-        #Si el user input es suficiente para meterlo a la bd
-        if response.sufficient : 
-            context=retriever.invoke(response.query)
-        # Si no, pregunta una follow-up question
-        else : 
-            return {"messages":[AIMessage(content=response.follow_up)]}
-    
+        context=retriever.invoke(response.query)
+
     response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context})
 
     return {"messages": [response]}
@@ -210,26 +207,44 @@ def get_summary(state: GraphState):
     return {"messages": messages}
 
 def summarize_conversation(state: GraphState):
-    # First, we get any existing summary
+    # Get any existing summary
     summary = state.get("summary", "")
-    # Create our summarization prompt 
+    
+    # Create summarization prompt
     if summary:
-        
         # A summary already exists
         summary_message = (
-            f"This is summary of the conversation to date: {summary}\n\n"
+            f"This is the summary of the conversation to date: {summary}\n\n"
             "Extend the summary by taking into account the new messages above:"
-        )  
+        )
     else:
         summary_message = "Create a summary of the conversation above:"
-
-    # Add prompt to our history
+    
+    # Add prompt to the history
     messages = state["messages"] + [HumanMessage(content=summary_message)]
     response = llm.invoke(messages)
-    
 
-    # Delete all but the 3 most recent messages
-    delete_messages = [RemoveMessage(id=m.id) for m in state["messages"][:-2]]
+    # Identify the last 2 messages, including their tool call pairs if necessary
+    last_two_messages = state["messages"][-2:]  # Get the last two messages
+    final_messages = []  # To store the final messages we want to keep
+
+    for message in last_two_messages:
+        
+        final_messages.append(message)
+        print(message)
+        # If the message is a ToolMessage, make sure to include the following AI response
+        if isinstance(message, ToolMessage):
+            print("tool")
+            tool_index = state["messages"].index(message)
+            if tool_index - 1 < len(state["messages"]) and isinstance(state["messages"][tool_index -1], AIMessage):
+                final_messages.append(state["messages"][tool_index - 1])
+                print("añadido tool")
+        
+
+    print(final_messages)
+    # Now prepare the list of messages to delete (all messages except the final ones)
+    delete_messages = [RemoveMessage(id=m.id) for m in state["messages"] if m not in final_messages]
+
     return {"summary": response.content, "messages": delete_messages}
 
 
@@ -374,7 +389,7 @@ def generate_response(message_body,wa_id):
     for output in app.stream(inputs,config=config):
         for key, value in output.items():
             pprint(f"Node '{key}':")
-            pprint(value, indent=2, width=80, depth=None)
+            #pprint(value, indent=2, width=80, depth=None)
             if 'messages' in value:
                 output_message=value["messages"][-1]
                 if isinstance(output_message,AIMessage) and output_message.content!='':
