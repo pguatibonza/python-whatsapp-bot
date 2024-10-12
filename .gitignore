@@ -97,3 +97,4 @@ data/
 docs/
 chatbot/
 *.sql
+*.pickle

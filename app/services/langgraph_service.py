@@ -133,7 +133,7 @@ class GraphState(TypedDict):
     user_input:str
     messages : Annotated[list, add_messages]
     dialog_state : Annotated[list[Literal["primary_assistant","rag_assistant"]],update_dialog_stack]
-    summary : str
+    summary : str = ""
 
 
 
@@ -173,38 +173,25 @@ def primary_assistant(state):
 
     user_input=state["user_input"]
     
-    response=main_agent.invoke({"input":user_input,"messages":state['messages']})
+    response=main_agent.invoke({"input":user_input,"messages":state['messages'], "summary":state.get("summary","")})
 
     return {"messages": [response],"user_input":user_input}
 
 def rag_assistant(state):
 
     user_input=state["user_input"]
-    response=context_router.invoke({"user_input":user_input,"messages":state["messages"]})
+    
+    response=context_router.invoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
 
     context=""
     #Si el user input necesia extraer info de la base de datos
     if response.database : 
         context=retriever.invoke(response.query)
 
-    response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context})
+    response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context ,"summary":state.get("summary","")})
 
     return {"messages": [response]}
 
-def get_summary(state: GraphState):
-    summary = state.get("summary", "")
-    if summary:
-        
-        # Add summary to system message
-        system_message = f"Summary of conversation earlier: {summary}"
-
-        messages=[SystemMessage(content=system_message)] + state['messages']
-
-        
-    else:
-        messages = state["messages"]
-    
-    return {"messages": messages}
 
 def summarize_conversation(state: GraphState):
     # Get any existing summary
@@ -236,12 +223,12 @@ def summarize_conversation(state: GraphState):
         if isinstance(message, ToolMessage):
             print("tool")
             tool_index = state["messages"].index(message)
-            if tool_index - 1 < len(state["messages"]) and isinstance(state["messages"][tool_index -1], AIMessage):
-                final_messages.append(state["messages"][tool_index - 1])
-                print("añadido tool")
-        
-
-    print(final_messages)
+            if tool_index - 1 < len(state["messages"]):
+                i=1
+                while  isinstance(state["messages"][tool_index - i],ToolMessage):
+                    final_messages.append(state["messages"][tool_index - i])
+                    i+=1   
+                final_messages.append(state["messages"][tool_index - i])
     # Now prepare the list of messages to delete (all messages except the final ones)
     delete_messages = [RemoveMessage(id=m.id) for m in state["messages"] if m not in final_messages]
 
@@ -343,10 +330,9 @@ def pop_dialog_state(state: GraphState) -> dict:
 workflow = StateGraph(GraphState)
 
 # Define the nodes
-workflow.add_node("get_summary", get_summary)
 
-workflow.add_edge(START,"get_summary")
-workflow.add_conditional_edges("get_summary",route_to_workflow)
+
+workflow.add_conditional_edges(START,route_to_workflow)
 
 workflow.add_node("primary_assistant",primary_assistant)
 
