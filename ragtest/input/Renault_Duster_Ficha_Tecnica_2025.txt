@@ -1,0 +1,210 @@
+Renault Duster - Ficha Técnica Completa por Versión - Modelo 2025
+
+Precio inicial:
+- Duster desde: $81.400.000*
+
+Versiones:
+
+1. **Renault Duster Zen MT 4x2**:
+   **Motor**:
+   - SCe 1.6L 16V
+   - Potencia: 114 HP @ 5.500 rpm
+   - Torque: 156 Nm @ 4.000 rpm
+   - Tipo de combustible: Gasolina
+   - Caja de velocidades: Manual, 5 velocidades + reversa
+   - Tracción: 4x2
+   - Relación de compresión: 9.8:1
+   - Alimentación: Inyección multipunto
+
+   **Desempeño**:
+   - Velocidad máxima: 174 km/h
+   - Aceleración de 0 a 100 km/h: 11.9 s
+   - Consumo mixto: 45 km/gal
+
+   **Frenos**:
+   - Discos ventilados delanteros
+   - Tambores traseros
+   - Frenos ABS con EBD (Distribución Electrónica de Frenado) y REF (Repartidor Electrónico de Frenado)
+
+   **Suspensión**:
+   - Delantera: Tipo McPherson, con triángulo inferior y barra estabilizadora
+   - Trasera: Eje flexible, barra estabilizadora
+
+   **Dirección y ruedas**:
+   - Dirección asistida eléctricamente (EPS)
+   - Neumáticos: 215/65 R16
+   - Rines: 16” de lámina
+
+   **Dimensiones**:
+   - Largo: 4.341 mm
+   - Ancho: 1.832 mm
+   - Alto: 1.693 mm
+   - Distancia entre ejes: 2.674 mm
+   - Capacidad del baúl: 475 L
+   - Capacidad del tanque de combustible: 50 L
+   - Peso en orden de marcha: 1.263 kg
+   - Carga útil: 489 kg
+   - Altura al piso: 209 mm
+
+   **Seguridad**:
+   - 2 airbags (conductor y pasajero)
+   - Control de estabilidad (ESP)
+   - Control de tracción (ASR)
+   - Asistente de arranque en pendiente (HSA)
+   - Control de velocidad crucero
+   - Sistema de frenado ABS + REF
+   - Anclajes ISOFIX para sillas infantiles
+   - Cinturones de seguridad de 3 puntos en todas las plazas
+   - Alarma sonora de cinturones no abrochados en todas las plazas
+   - Sensor de reversa
+
+   **Confort**:
+   - Aire acondicionado manual
+   - Elevavidrios eléctricos delanteros y traseros
+   - Volante regulable en altura y profundidad
+   - Llave abatible con telecomando
+   - Asiento del conductor ajustable en altura
+   - Sistema de sonido con radio, MP3, USB, entrada auxiliar y Bluetooth®
+   - Computador de a bordo
+
+   **Multimedia**:
+   - Sistema de sonido con pantalla de 4.2", Bluetooth®, radio AM/FM, entrada USB y auxiliar
+
+   **Diseño exterior**:
+   - Faros de marcha diurna LED
+   - Barras de techo longitudinales negras
+   - Ski delantero y trasero en color plata
+   - Retrovisores eléctricos y abatibles
+   - Rines de 16” de lámina
+
+2. **Renault Duster Intens MT 4x2** (Incluye características de Zen más):
+   **Confort adicional**:
+   - Sistema multimedia Easy Link con pantalla táctil de 8” compatible con Android Auto® y Apple CarPlay® (inalámbrico)
+   - Cámara de reversa
+   - Exploradoras con función antiniebla
+   - Volante forrado en material TEP
+   - Retrovisores eléctricos en color negro brillante
+
+   **Diseño adicional**:
+   - Rines de aluminio de 16” Flexwheel bi-tono
+   - Luces traseras LED con firma luminosa en forma de C
+
+3. **Renault Duster Intens CVT 4x2** (Incluye características de Intens MT más):
+   **Motor**:
+   - Caja automática CVT X-Tronic con modo manual de 8 velocidades
+   - Aire acondicionado automático
+
+   **Desempeño adicional**:
+   - Modo manual de 8 velocidades en la caja CVT
+   - Aceleración de 0 a 100 km/h: 10.9 s
+
+4. **Renault Duster Intens 1.3 Turbo 4x4 MT** (Incluye características de Intens MT más):
+   **Motor**:
+   - 1.3L Turbo, 16 válvulas
+   - Potencia: 154 HP @ 4.500 rpm
+   - Torque: 250 Nm @ 1.700 rpm
+   - Tracción: 4x4
+   - Caja de velocidades: Manual, 6 velocidades + reversa
+
+   **Desempeño adicional**:
+   - Sistema de modos de tracción: 2WD, Automático, 4x4 Lock
+   - Control de descenso (HDC)
+   - Monitor 4x4 (monitoreo de ángulos de cabeceo y balanceo)
+
+   **Rines adicionales**:
+   - Rines de 17” aluminio diamantado
+
+   **Seguridad adicional**:
+   - Control de descenso (HDC)
+   - Sistema 4x4 Lock
+
+Dimensiones por Versión (mm):
+1. Zen MT 4x2:
+   - Largo: 4.341 mm
+   - Ancho: 1.832 mm
+   - Alto: 1.693 mm
+   - Distancia entre ejes: 2.674 mm
+   - Capacidad del baúl: 475 L
+   - Altura al piso: 209 mm
+
+2. Intens MT 4x2:
+   - Mismas dimensiones que Zen MT
+
+3. Intens CVT 4x2:
+   - Mismas dimensiones que Zen MT
+
+4. Intens 1.3T MT 4x4:
+   - Largo: 4.341 mm
+   - Ancho: 1.832 mm
+   - Alto: 1.693 mm
+   - Distancia entre ejes: 2.674 mm
+   - Capacidad del baúl: 400 L (debido a la tracción 4x4)
+   - Altura al piso: 209 mm
+
+Accesorios Disponibles:
+  - **Exterior**:
+    - Protector frontal
+    - Exploradoras
+    - Ensanchadores pasorueda
+    - Boceles puerta
+    - Becquet
+    - Estribos
+    - Protector puerta baúl
+    - Embellecedor de escape
+    - Deflectores de aire
+    - Antena tipo tiburón
+    - Kit Outsider (protector frontal, ensanchadores paso rueda, boceles puerta, exploradoras)
+  - **Transporte - Protección**:
+    - Barras de techo
+    - Portabicicletas
+    - Guardapolvos
+    - Cámara reversa
+    - Cámara de video DVR
+    - Sensores de reversa
+    - Alarma
+    - Seguro llanta repuesto
+    - Módulo de parqueo
+    - Tiro de arrastre
+    - Pernos de seguridad
+    - Sensor punto ciego
+    - Sensor presión llantas
+  - **Interior**:
+    - Protector de baúl
+    - Protector modular de baúl
+    - Tapete termoformado de baúl
+    - Tapete de caucho
+    - Moldura estribo Duster
+    - Moldura estribo luminosa
+    - Malla baúl
+    - Guantera central
+    - Tapete textil
+    - Tapete termoformado
+    - Parasoles
+    - Organizador de maletero
+    - Grilla de separación
+    - Cojinería en cuero
+    - Sunroof
+  - **Multimedia**:
+    - Centro de entretenimiento Upgrade
+    - Juego de pantallas DVD/Mirror link
+    - Cargador inalámbrico para celular
+    - Cabecero DVD
+    - Sonido Focal®
+
+Colores Disponibles:
+  - Rojo Fuego
+  - Marrón Bisonte
+  - Beige Duna
+  - Gris Estrella
+  - Gris Cassiopée
+  - Blanco Glacial
+
+Servicios:
+  - **Contratos de Mantenimiento**:
+    - Contrata revisiones estándar de mantenimiento para tu Duster con el Plan Único de Mantenimiento Renault
+    - Beneficios: precio fijo, transferibilidad del contrato al nuevo propietario
+  - **Garantía Extendida**:
+    - Ampliación de la garantía original de fábrica por 1 año o 50.000 km, o 3 años o 100.000 km
+  - **Renault Seguro**:
+    - Póliza exclusiva Renault que cubre el vehículo en la red de concesionarios
+    - Incluye beneficios especiales en primas, coberturas, asistencias, y repuestos originales

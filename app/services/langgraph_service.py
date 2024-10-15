@@ -30,10 +30,16 @@ from langchain_core.messages import ToolMessage, HumanMessage, RemoveMessage,Sys
 from langgraph.prebuilt import ToolNode
 import logging
 import os
-from . import tools_restaurant
+
+# import supabase_service
+# import tools
+# from prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
+# from graphrag_service import search_engine
+
 from . import supabase_service
 from . import tools
 from .prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
+from .graphrag_service import search_engine
 
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -53,18 +59,13 @@ chat = ChatOpenAI(model="gpt-4o", temperature=0)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 vector_store = supabase_service.load_vector_store()
-retriever=vector_store.as_retriever(search_kwargs={"k":20})
+retriever=vector_store.as_retriever(search_kwargs={"k":3})
 #memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 memory=MemorySaver()
 
 
-
-
-
-
 #LLM with function call
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
-llm_tools=tools.TOOLS
 agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.toRagAssistant])
 
 
@@ -114,7 +115,7 @@ prompt = ChatPromptTemplate.from_messages(
 )
 
 
-context_router = prompt | llm.with_structured_output(tools.QueryIdentifier)
+context_router = prompt | llm.bind_tools([tools.CompleteOrEscalate,tools.QueryIdentifier])
 
 
 ###Graph state
@@ -134,6 +135,7 @@ class GraphState(TypedDict):
     messages : Annotated[list, add_messages]
     dialog_state : Annotated[list[Literal["primary_assistant","rag_assistant"]],update_dialog_stack]
     summary : str = ""
+    context : str =""
 
 
 
@@ -159,7 +161,7 @@ def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
 
     return entry_node
 
-def primary_assistant(state):
+async def primary_assistant(state):
     """
     Invokes the agent model to generate a response based on the current state. Given
     the input, it will decide to use any tool, retrieve info, or keep chatting.
@@ -173,27 +175,37 @@ def primary_assistant(state):
 
     user_input=state["user_input"]
     
-    response=main_agent.invoke({"input":user_input,"messages":state['messages'], "summary":state.get("summary","")})
+    response=await main_agent.ainvoke({"input":user_input,"messages":state['messages'], "summary":state.get("summary","")})
 
     return {"messages": [response],"user_input":user_input}
+async def rag_router(state):
+    user_input=state["user_input"]
 
-def rag_assistant(state):
+    response=await context_router.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
+    return {"messages" : [response]}
+
+async def graph_rag(state):
+    tool_call=state["messages"][-1].tool_calls[0]
+    tool_call_id=tool_call["id"]
+    query=tool_call["args"]["query"]
+    message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
+
+    response = await search_engine.asearch(query)
+
+    return {"context":response.response,"messages":[message]}
+
+async def rag_assistant(state):
 
     user_input=state["user_input"]
+
+    context=state.get("context","")
+
+    response=await  rag_agent.ainvoke({"user_input":user_input,"messages":state["messages"],"context":context ,"summary":state.get("summary","")})
     
-    response=context_router.invoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
-
-    context=""
-    #Si el user input necesia extraer info de la base de datos
-    if response.database : 
-        context=retriever.invoke(response.query)
-
-    response= rag_agent.invoke({"user_input":user_input,"messages":state["messages"],"context":context ,"summary":state.get("summary","")})
-
     return {"messages": [response]}
 
 
-def summarize_conversation(state: GraphState):
+async def summarize_conversation(state: GraphState):
     # Get any existing summary
     summary = state.get("summary", "")
     
@@ -209,7 +221,7 @@ def summarize_conversation(state: GraphState):
     
     # Add prompt to the history
     messages = state["messages"] + [HumanMessage(content=summary_message)]
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
 
     # Identify the last 2 messages, including their tool call pairs if necessary
     last_two_messages = state["messages"][-2:]  # Get the last two messages
@@ -247,7 +259,7 @@ def should_summarize(state:GraphState):
     messages = state["messages"]
     
     # If there are more than six messages, then we summarize the conversation
-    if len(messages) > 10:
+    if len(messages) > 20:
         return "summarize_conversation"
     
     # Otherwise we can just end
@@ -278,7 +290,7 @@ def route_to_workflow(
     state: GraphState,
 ) -> Literal[
     "primary_assistant",
-    "rag_assistant",
+    "router_rag_assistant",
 ]:
     """If we are in a delegated state, route directly to the appropriate assistant."""
     dialog_state = state.get("dialog_state")
@@ -302,7 +314,14 @@ def route_assistants(
     if did_cancel:
         return "leave_skill"
     
-
+def route_rag_assistant(state:GraphState) -> Literal["leave_skill","graph_rag","rag_assistant"]:
+    tool_calls = state["messages"][-1].tool_calls
+    if tool_calls:
+        if tool_calls[0]["name"] == tools.CompleteOrEscalate.__name__:
+            return "leave_skill"
+        elif tool_calls[0]["name"] == tools.QueryIdentifier.__name__:
+            return "graph_rag"
+    return "rag_assistant"
 # This node will be shared for exiting all specialized assistants
 def pop_dialog_state(state: GraphState) -> dict:
     """Pop the dialog stack and return to the main assistant.
@@ -336,9 +355,12 @@ workflow.add_conditional_edges(START,route_to_workflow)
 
 workflow.add_node("primary_assistant",primary_assistant)
 
-workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "rag_assistant"))  
+workflow.add_node("router_rag_assistant",rag_router)
+workflow.add_conditional_edges("router_rag_assistant", route_rag_assistant)
+
+workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "router_rag_assistant"))  
 workflow.add_node("rag_assistant", rag_assistant)
-workflow.add_edge("enter_rag_assistant","rag_assistant")
+workflow.add_edge("enter_rag_assistant","router_rag_assistant")
 
 workflow.add_node("tools",ToolNode([tools.create_event_test_drive]))
 workflow.add_edge("tools","primary_assistant")
@@ -353,6 +375,9 @@ workflow.add_conditional_edges(
         END: END,
     },
 )
+workflow.add_node("graph_rag",graph_rag)
+workflow.add_edge("graph_rag","rag_assistant")
+
 workflow.add_conditional_edges("rag_assistant", route_assistants)
 workflow.add_node("leave_skill",pop_dialog_state)
 workflow.add_edge("leave_skill", "primary_assistant")
@@ -368,11 +393,11 @@ config = {"configurable": {"thread_id": "6"}}
 
 # Run
 
-def generate_response(message_body,wa_id):
-    config={"configurable": {"thread_id":"1111113"}}
+async def generate_response(message_body,wa_id):
+    config={"configurable": {"thread_id":wa_id}}
     inputs={"messages": message_body, "user_input": message_body}
     messages_output=[]
-    for output in app.stream(inputs,config=config):
+    async for output in app.astream(inputs,config=config):
         for key, value in output.items():
             pprint(f"Node '{key}':")
             #pprint(value, indent=2, width=80, depth=None)

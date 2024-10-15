@@ -1,0 +1,164 @@
+Renault Kwid E-Tech - Ficha Técnica Completa por Versión - Modelo 2025
+
+Precio inicial:
+- Kwid E-Tech Intens 2025: $99.990.000*
+
+### Especificaciones Técnicas
+
+**Arquitectura**:
+- Tipo de carrocería: Monocasco, monovolumen
+- Capacidad: 4 plazas, 5 puertas
+
+**Motor**:
+- Tipo: Motor eléctrico síncrono de imanes permanentes con reductor integrado
+- Potencia máxima: 65 HP (48 kW)
+- Torque máximo: 113 Nm
+
+**Batería**:
+- Tipo: Batería de tracción
+- Capacidad: 26.8 kWh
+- Peso de la batería: 188 kg
+
+**Autonomía**:
+- Autonomía máxima: Hasta 298 km (según norma internacional SAE J1634)
+- Modo ECO: Aumenta la autonomía hasta un 9%
+
+**Transmisión**:
+- Tipo de transmisión: Automática
+- Cambios: Una marcha adelante, una marcha atrás
+
+**Frenos**:
+- Delanteros: Discos ventilados
+- Traseros: Tambores
+
+**Dirección**:
+- Tipo: Dirección asistida eléctricamente
+
+**Ruedas y Neumáticos**:
+- Tamaño de las llantas: 175/70 R14
+- Rines: Flex Wheel bi-tono de 14”
+
+**Desempeño**:
+- Velocidad máxima: 130 km/h
+- Aceleración de 0-50 km/h: 4.1 segundos
+- Aceleración de 0-100 km/h: 14.6 segundos
+- Peso en orden de marcha: 977 kg
+
+**Dimensiones**:
+- Largo: 3.734 mm
+- Ancho: 1.770 mm
+- Alto: 1.500 mm
+- Distancia entre ejes: 2.423 mm
+- Altura al suelo: 166 mm
+- Capacidad del baúl: 290 L, ampliable a 1.100 L con los asientos traseros abatidos
+
+### Modos de Carga y Puertos
+
+**Modos de carga**:
+- Cargador portátil (incluido): 110V/220V (2.2 kW máximo - 10A)
+- Carga rápida DC (estaciones): Hasta 30 kW, carga del 15% al 80% en 40 minutos
+- Carga con cargador de pared AC: Hasta 7 kW
+
+**Puertos de carga**:
+- AC: CCS tipo 2
+- DC: CCS combo 2
+
+---
+
+### Seguridad
+
+- 6 airbags: 2 frontales, 2 laterales, 2 de cortina
+- Control electrónico de estabilidad (ESP)
+- Control de tracción (ASR)
+- Frenos ABS con EBD (Distribución Electrónica de Frenado)
+- Frenado autónomo de emergencia (AEB)
+- Alerta de colisión frontal
+- Sistema de asistencia al arranque en pendiente (HSA)
+- Sistema de sujeción infantil ISOFIX (2 puntos)
+- Alerta de presión de llantas (TPW)
+- Cámara de reversa con sensores de estacionamiento
+- Alerta de presencia de peatones (VSP)
+- Cinturones de seguridad de 3 puntos con pretensores
+
+---
+
+### Confort
+
+- Aire acondicionado manual
+- Elevavidrios eléctricos delanteros y traseros
+- Volante ajustable con asistencia eléctrica
+- Llave abatible con apertura y cierre remoto
+- Modo ECO para optimización de autonomía
+- Computador de a bordo con información de consumo y autonomía
+- Maletero con capacidad de 290 L, ampliable a 1.100 L
+- Dirección asistida eléctrica
+
+---
+
+### Multimedia
+
+- Sistema multimedia Media Evolution con pantalla táctil de 7”
+- Replicación de smartphone: Android Auto® y Apple CarPlay®
+- Conectividad Bluetooth®
+- Entrada USB
+- Cuadro de instrumentos digital
+- Modo ECO para maximizar la autonomía
+- Frenado regenerativo
+
+---
+
+### Diseño Exterior
+
+- Luces diurnas LED (DRL)
+- Luces traseras LED
+- Faros antiniebla traseros
+- Manijas exteriores del color de la carrocería
+- Retrovisores eléctricos con repetidores de dirección integrados
+- Barras de techo decorativas
+- Rines Flex Wheel bi-tono de 14”
+- Diseño SUV compacto con protecciones laterales E-Tech
+
+---
+
+### Colores Disponibles
+
+- Gris Diamond
+- Blanco Ópalo
+- Gris Liquen
+
+---
+
+### Accesorios Disponibles
+
+- **Exterior**:
+  - Estribos laterales
+  - Protector de parachoques trasero
+  - Tapas de retrovisor con embellecedores cromados
+  - Barras longitudinales para el techo
+
+- **Interior**:
+  - Tapetes termoformados
+  - Cojinería en cuero sintético
+  - Malla de separación para el maletero
+  - Cargador inalámbrico para smartphones
+
+---
+
+### Servicios
+
+- **Contratos de Mantenimiento**:
+  - Incluye revisiones estándar con el Plan Único de Mantenimiento Renault por 1, 2 o 3 años. Beneficios de precio fijo y transferibilidad al nuevo propietario.
+
+- **Garantía Extendida**:
+  - Extiende la garantía de fábrica por 1 año o 50.000 km adicionales, o hasta 3 años o 100.000 km.
+
+- **Renault Seguro**:
+  - Póliza exclusiva Renault con beneficios en primas, coberturas, asistencias, y repuestos originales en concesionarios autorizados.
+
+---
+
+### Garantías
+
+- Garantía de fábrica: 3 años o 100.000 km
+- Garantía de la batería: 8 años o 160.000 km
+- Asistencia en carretera gratuita durante el período de garantía

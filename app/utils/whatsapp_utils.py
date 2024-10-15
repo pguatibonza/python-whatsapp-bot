@@ -1,5 +1,5 @@
 import logging
-from flask import current_app, jsonify
+from quart import current_app, jsonify
 import json
 import requests
 #from app.services.openai_service import generate_response
@@ -76,7 +76,8 @@ def process_text_for_whatsapp(text):
     return whatsapp_style_text
 
 
-def process_whatsapp_message(body):
+async def process_whatsapp_message(body):
+    
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
     #name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
 
@@ -87,7 +88,7 @@ def process_whatsapp_message(body):
     #response = generate_response(message_body)
 
     # OpenAI and Langchain Integration
-    responses = generate_response(message_body, wa_id)
+    responses = await generate_response(message_body, wa_id)
     
     for response in responses:
         processed_response = process_text_for_whatsapp(response)  # Process the message for WhatsApp formatting

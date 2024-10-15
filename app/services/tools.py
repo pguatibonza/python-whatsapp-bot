@@ -1,5 +1,6 @@
 import os
 import pickle
+from typing import Literal, Optional
 import google.auth
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -89,6 +90,22 @@ class CompleteOrEscalate(BaseModel):
     cancel: bool =True
     reason: str
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "cancel": True,
+                "reason": "User changed their mind about the current task.",
+            },
+            "example 2": {
+                "cancel": True,
+                "reason": "User wanted to schedule a test drive.",
+            },
+            "example 3": {
+                "cancel": False,
+                "reason": "User wants to know more information about the car/car dealersip .",
+            },
+        }
+
 class toRagAssistant(BaseModel):
     """
     Transfers work to a specialized assistant  to handle any conceptual doubts/inquiries about the vehicles available. 
@@ -102,7 +119,6 @@ class QueryIdentifier(BaseModel):
     """Identify if the model needs to extract info from the vector database to answer the user and if it does, 
     it identifies if the user input is sufficient to search in the database. If not, then a follow-up question is asked"""
 
-    database : bool = Field(description='True if the model needs to extract info from the vector database')
     query : str = Field(description=' query that is going to enter into the vector store to retrieve the information the user needs')
-TOOLS=[tool_create_event_test_drive,toRagAssistant,CompleteOrEscalate]
+
 
