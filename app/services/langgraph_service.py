@@ -172,17 +172,21 @@ async def primary_assistant(state):
     Returns:
         dict: The updated state with the agent response appended to messages
     """
-
+    logging.debug("Entering primary_assistant node")
     user_input=state["user_input"]
     
     response=await main_agent.ainvoke({"input":user_input,"messages":state['messages'], "summary":state.get("summary","")})
-
+    
+    logging.debug(f"Response from primary_assistant: {response.content}")
     return {"messages": [response],"user_input":user_input}
+
+
 async def rag_router(state):
     user_input=state["user_input"]
 
     response=await context_router.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
     return {"messages" : [response]}
+
 
 async def graph_rag(state):
     tool_call=state["messages"][-1].tool_calls[0]

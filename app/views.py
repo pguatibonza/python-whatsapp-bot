@@ -1,5 +1,6 @@
 import logging
 import json
+import asyncio
 
 from quart import Blueprint, request, jsonify, current_app
 
@@ -11,53 +12,23 @@ from .utils.whatsapp_utils import (
 
 webhook_blueprint = Blueprint("webhook", __name__)
 
-
-async def handle_message():
+async def handle_message(body: dict):
     """
-    Handle incoming webhook events from the WhatsApp API.
-
-    This function processes incoming WhatsApp messages and other events,
-    such as delivery statuses. If the event is a valid message, it gets
-    processed. If the incoming payload is not a recognized WhatsApp event,
-    an error is returned.
-
-    Every message send will trigger 4 HTTP requests to your webhook: message, sent, delivered, read.
-
-    Returns:
-        response: A tuple containing a JSON response and an HTTP status code.
+    Asynchronously handle incoming webhook events from WhatsApp.
     """
-    body = await  request.get_json()
+    if is_valid_whatsapp_message(body):
+        logging.info("Valid WhatsApp message received, processing message...")
+        response = await process_whatsapp_message(body)
+        logging.info("Message processed and response sent.")
+        return response
+    else:
+        # If the request is not a WhatsApp API event, return an error
+        return (
+            jsonify({"status": "error", "message": "Not a WhatsApp API event"}),
+            404,
+        )
 
-    # logging.info(f"request body: {body}")
-
-    # Check if it's a WhatsApp status update
-    if (
-        body.get("entry", [{}])[0]
-        .get("changes", [{}])[0]
-        .get("value", {})
-        .get("statuses")
-    ):
-        logging.info(f"Received a WhatsApp status update. Type: {body["entry"][0]["changes"][0]["value"]["statuses"][0]["status"]}")
-        return jsonify({"status": "ok"}), 200
-
-    try:
-        if is_valid_whatsapp_message(body):
-            logging.info("Valid WhatsApp message received, processing message...")
-            await process_whatsapp_message(body)
-            logging.info("Message processed and response sent.")
-            return jsonify({"status": "ok"}), 200
-        else:
-            # if the request is not a WhatsApp API event, return an error
-            return (
-                jsonify({"status": "error", "message": "Not a WhatsApp API event"}),
-                404,
-            )
-    except json.JSONDecodeError:
-        logging.error("Failed to decode JSON")
-        return jsonify({"status": "error", "message": "Invalid JSON provided"}), 400
-
-
-# Required webhook verifictaion for WhatsApp
+# Required webhook verification for WhatsApp
 def verify():
     # Parse params from the webhook verification request
     mode = request.args.get("hub.mode")
@@ -79,7 +50,6 @@ def verify():
         logging.info("MISSING_PARAMETER")
         return jsonify({"status": "error", "message": "Missing parameters"}), 400
 
-
 @webhook_blueprint.route("/webhook", methods=["GET"])
 def webhook_get():
     return verify()
@@ -87,6 +57,11 @@ def webhook_get():
 @webhook_blueprint.route("/webhook", methods=["POST"])
 @signature_required
 async def webhook_post():
-    return await handle_message()
-
-
+    body = await request.get_json()
+    logging.info(f"Received webhook: {json.dumps(body)}")
+    
+    # Offload processing to a background task
+    asyncio.create_task(handle_message(body))
+    
+    # Respond immediately to prevent WhatsApp retries
+    return jsonify({"status": "received"}), 200
