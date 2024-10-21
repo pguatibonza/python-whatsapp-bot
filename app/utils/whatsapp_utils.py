@@ -75,7 +75,7 @@ async def is_duplicate_message(message_id: str) -> bool:
         if message_id in dedup_set:
             return True
         else:
-            expiration_time = datetime.timezone.utc() + timedelta(seconds=DEDUP_TTL_SECONDS)
+            expiration_time = datetime.now() + timedelta(seconds=DEDUP_TTL_SECONDS)
             dedup_store.append((message_id, expiration_time))
             dedup_set.add(message_id)
             return False
@@ -84,7 +84,7 @@ async def cleanup_dedup_store():
     while True:
         await asyncio.sleep(60)  # Run cleanup every minute
         async with dedup_lock:
-            now = datetime.timezone.utc()
+            now = datetime.now()
             while dedup_store and dedup_store[0][1] < now:
                 expired_id, _ = dedup_store.popleft()
                 dedup_set.discard(expired_id)

@@ -1,0 +1,216 @@
+**Brand**: *Renault*  
+**Model**: *Oroch*  
+**Year**: *2024*  
+
+**Sub Models**:
+- **Oroch Cargo 4x4**: *$101.200.000*
+- **Oroch Zen 4x4**: *$109.900.000*
+- **Oroch Intens CVT 4x2**: *$114.900.000*
+- **Oroch Intens 4x4 Outsider**: *$119.900.000*
+
+---
+### **Versiones**
+
+---
+**1. Renault Oroch Cargo 4x4**
+
+- **Motor**:
+  - **Tipo**: 1.3L Turbo, 16 válvulas, 4 cilindros
+  - **Potencia**: 154 HP @ 5.500 rpm
+  - **Torque**: 250 Nm @ 1.600 - 3.750 rpm
+  - **Tipo de Combustible**: Gasolina
+  - **Caja de Velocidades**: Manual de 6 velocidades + reversa
+  - **Tracción**: 4x4
+  - **Relación de Compresión**: 10.0:1
+  - **Alimentación**: Inyección directa con turbocompresor
+
+- **Desempeño**:
+  - **Aceleración de 0 a 100 km/h**: 11.9 s
+  - **Consumo Combinado**: 42 km/gal
+  - **Velocidad Máxima**: 187 km/h
+
+- **Frenos**:
+  - **Delanteros**: Discos ventilados
+  - **Traseros**: Tambores
+  - **Sistema**: Frenos ABS con EBD y AFU (Asistencia de Frenado de Emergencia)
+
+- **Suspensión**:
+  - **Delantera**: Independiente tipo McPherson con barra estabilizadora, amortiguadores hidráulicos telescópicos
+  - **Trasera**: Independiente Multilink con barra estabilizadora, amortiguadores hidráulicos telescópicos
+
+- **Dirección y Ruedas**:
+  - **Dirección**: Asistida electrohidráulicamente
+  - **Neumáticos**: 215/65 R16
+  - **Rines**: 16" de acero con tapacubos
+
+- **Dimensiones**:
+  - **Largo**: 4.719 mm
+  - **Ancho**: 1.821 mm
+  - **Alto**: 1.694 mm
+  - **Distancia entre Ejes**: 2.829 mm
+  - **Distancia al Suelo**: 212 mm
+  - **Capacidad del Platón**: 683 L
+  - **Capacidad de Carga**: 650 kg
+  - **Peso en Orden de Marcha**: 1.378 kg
+
+- **Seguridad**:
+  - **Airbags**: 2 frontales para conductor y pasajero
+  - **Sistemas**: ABS, Control de Estabilidad (ESP), Control de Tracción (TCS)
+  - **Asistentes**: Asistente de arranque en pendiente (HSA)
+  - **Anclajes**: ISOFIX para sillas infantiles
+  - **Otros**: Alarma perimetral
+
+- **Confort**:
+  - **Climatización**: Aire acondicionado manual
+  - **Volante**: Regulable en altura
+  - **Control de Crucero**: Con limitador de velocidad
+  - **Asientos**: Asiento del conductor ajustable en altura
+  - **Ventanas**: Vidrios eléctricos delanteros con función de un solo toque
+  - **Computador de a bordo**: Información de consumo, autonomía y distancia recorrida
+
+- **Multimedia**:
+  - **Sistema Multimedia**: Radio 2DIN, Bluetooth®, USB
+  - **Comandos**: Comando satelital para audio en el volante
+
+- **Diseño Exterior**:
+  - **Parrilla Frontal**: Color negro con detalles cromados
+  - **Parachoques**: Delantero y trasero en color negro
+  - **Faros**: Halógenos con ajuste manual de altura
+  - **Barras de Techo**: Longitudinales en negro (capacidad de carga: 80 kg)
+  - **Rines**: 16" de acero con tapacubos
+
+---
+**2. Renault Oroch Zen 4x4**  
+*(Incluye características de Cargo más)*
+
+- **Confort adicional**:
+  - Aire acondicionado automático
+  - Asientos con tapicería en tela premium con detalles en costuras
+  - Volante y palanca de cambios forrados en cuero sintético
+  - Llave plegable con apertura remota
+  - Función "Follow Me Home" para los faros
+  - Computador de a bordo con pantalla más avanzada
+
+- **Diseño Exterior adicional**:
+  - Parachoques delantero y trasero en color carrocería
+  - Rin de 16" de aleación metalizado oscuro
+
+---
+**3. Renault Oroch Intens CVT 4x2**  
+*(Incluye características de Zen más)*
+
+- **Motor**:
+  - **Tipo**: 1.3L Turbo, 16 válvulas, 4 cilindros
+  - **Potencia**: 154 HP @ 5.500 rpm
+  - **Torque**: 250 Nm @ 1.600 - 3.750 rpm
+  - **Caja de Velocidades**: Automática CVT X-Tronic con modo manual de 8 velocidades
+  - **Tracción**: 4x2
+
+- **Confort adicional**:
+  - Sistema multimedia Easy Link con pantalla táctil de 8", compatible con Android Auto® y Apple CarPlay®
+  - Vidrios eléctricos traseros con función de un solo toque
+  - Sensores de luz y lluvia para activación automática
+  - Cámara de reversa con guías dinámicas
+
+- **Diseño Exterior adicional**:
+  - Rines de aleación bitono diamantados de 16"
+  - Faros antiniebla con función cornering (iluminación en curva)
+
+---
+**4. Renault Oroch Intens 4x4 Outsider**  
+*(Incluye características de Intens más)*
+
+- **Diseño adicional**:
+  - Barra antivuelco estilo "San Antonio" en acero
+  - Ensanchadores de pasos de rueda
+  - Capota de lona para el platón
+  - Protector para el vidrio trasero
+
+---
+### **Dimensiones por Versión (mm)**
+
+**1. Cargo 4x4**:
+- **Largo**: 4.719 mm
+- **Ancho**: 1.821 mm
+- **Alto**: 1.694 mm
+- **Distancia entre ejes**: 2.829 mm
+- **Capacidad del Platón**: 683 L
+- **Capacidad de Carga**: 650 kg
+- **Altura al Suelo**: 212 mm
+
+**2. Zen 4x4**:
+- **Mismas dimensiones que Cargo 4x4**
+
+**3. Intens CVT 4x2**:
+- **Mismas dimensiones que Cargo 4x4**
+
+**4. Intens 4x4 Outsider**:
+- **Mismas dimensiones que Cargo 4x4**
+
+---
+### **Accesorios Disponibles**
+
+- **Exterior**:
+  - Kit sport
+  - Exploradoras
+  - Lip frontal
+
+- **Transporte - Protección**:
+  - Alarma Plug&Play con Bluetooth®
+  - Cámara de video DVR
+  - Sensores de estacionamiento delanteros y traseros
+  - Tiro de arrastre con conector eléctrico
+  - Sensor de presión de llantas
+  - Seguro para llanta de repuesto
+
+- **Interior**:
+  - Tapetes termoformados de caucho
+  - Molduras iluminadas para estribos
+  - Malla de separación para el platón
+  - Organizador de maletero
+  - Cojinería en cuero premium
+  - Luz de cortesía para el platón
+  - Cargador inalámbrico para smartphones
+
+- **Multimedia**:
+  - Sonido Focal® Premium
+  - Soporte magnético para smartphones
+  - Puerto USB adicional
+  - DVD Player 9"
+  - Cabecero DVD
+
+---
+### **Servicios**
+
+- **Contratos de Mantenimiento**:
+  - Permite contratar anticipadamente las revisiones estándar del vehículo según el Plan de Mantenimiento Renault.
+  - **Beneficios**: Precio fijo, transferibilidad al nuevo propietario en caso de venta del vehículo.
+
+- **Garantía Extendida**:
+  - Amplía la protección del vehículo un año o 50.000 km, o tres años o 100.000 km, lo que ocurra primero, para cubrir eventuales fallas mecánicas y/o eléctricas.
+
+- **Renault Seguro**:
+  - Póliza exclusiva Renault que cubre el vehículo con repuestos originales, beneficios en primas y asistencias en concesionarios autorizados.
+
+- **Renault Crédito**:
+  - Ofrece financiación y seguros para facilitar la compra del nuevo Renault Logan.
+
+- **My Renault**:
+  - Acceso a un programa de beneficios para propietarios de vehículos Renault.
+
+---
+### **Colores Disponibles**
+
+- *Blanco Glacial*
+- *Gris Estrella*
+- *Gris Taupé*
+- *Negro Nacarado*
+- *Rojo Fuego*
+
+---
+### **Garantías**
+
+- **Garantía de Fábrica**: 2 años o 50.000 km
+- **Garantía de Corrosión**: 6 años
+- **Garantía de Pintura**: 3 años
+- **Asistencia en Carretera**: Gratuita durante el período de garantía.

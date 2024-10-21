@@ -16,6 +16,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TABLE_NAME=os.getenv("TABLE_NAME")
+TABLE_NAME_VEHICLES=os.getenv("TABLE_NAME_VEHICLES")
 embeddings=OpenAIEmbeddings()
 
 # Crear cliente de Supabase
@@ -23,7 +24,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 print(f"Supabase client initialized: {supabase}")
 
 #Crear indice para evitar duplicados
-namespace=f"concesionarios/parra-arango/{TABLE_NAME}"
+namespace=f"concesionarios/los-coches/{TABLE_NAME}"
 record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache.sql")
 #Must do when creating the index for the first time
 # record_manager.create_schema()
@@ -84,3 +85,16 @@ def load_file(file_path):
 
 
 #load_directory("docs/wagen/")
+
+def load_vehicle_brands_models():
+    response = supabase.table(TABLE_NAME_VEHICLES).select('marca, modelo, id').execute()
+    logging.info("Información vehiculos extraida correctamente")
+    data=response.data
+    return data
+
+def load_vehicle_info_by_id(id):
+    reponse=supabase.table(TABLE_NAME_VEHICLES).select('*').eq("id", id).execute()
+    logging.info("Información de vehiculo extraida correctamente")
+    data=reponse.data
+    return data
+    

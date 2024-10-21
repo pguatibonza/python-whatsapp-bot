@@ -31,15 +31,15 @@ from langgraph.prebuilt import ToolNode
 import logging
 import os
 
-# import supabase_service
-# import tools
-# from prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
-# from graphrag_service import search_engine
+import supabase_service
+import tools
+from prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT , MULTIMEDIA_ASSISTANT_PROMPT
+from graphrag_service import search_engine
 
-from . import supabase_service
-from . import tools
-from .prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT
-from .graphrag_service import search_engine
+# from . import supabase_service
+# from . import tools
+# from .prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT, MULTIMEDIA_ASSISTANT_PROMPT
+# from .graphrag_service import search_engine
 
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -58,8 +58,8 @@ chat = ChatOpenAI(model="gpt-4o", temperature=0)
 # Crear cliente de Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
-vector_store = supabase_service.load_vector_store()
-retriever=vector_store.as_retriever(search_kwargs={"k":3})
+#vector_store = supabase_service.load_vector_store()
+#retriever=vector_store.as_retriever(search_kwargs={"k":3})
 #memory = SqliteSaver.from_conn_string(":memory:") #despues se conecta a bd
 memory=MemorySaver()
 
@@ -83,7 +83,7 @@ main_agent=prompt | agent
 
 
 ### RAG ASSISTANT
-llm = ChatOpenAI(model="gpt-4o", temperature=0).bind_tools([tools.CompleteOrEscalate])
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 
 prompt = ChatPromptTemplate.from_messages(
@@ -115,8 +115,21 @@ prompt = ChatPromptTemplate.from_messages(
 )
 
 
-context_router = prompt | llm.bind_tools([tools.CompleteOrEscalate,tools.QueryIdentifier])
+context_router = prompt | llm.bind_tools([tools.CompleteOrEscalate,tools.QueryIdentifier,tools.MultimediaIdentifier])
 
+### Get multimedia info
+
+llm = ChatOpenAI(model="gpt-4o",temperature=0)
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", MULTIMEDIA_ASSISTANT_PROMPT),
+        ("human", "{user_input}"),
+        ("placeholder", "{messages}")
+    ]
+)
+
+multimedia_agent = prompt | llm.bind_tools([tools.tool_get_car_technical_info])
 
 ###Graph state
 
@@ -147,10 +160,7 @@ def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
         for tool_call in state["messages"][-1].tool_calls:
             tool_call_id = tool_call["id"]
             message =ToolMessage(
-                        content=f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user."
-                        f" The user's intent is unsatisfied. Use the provided tools to assist the user. Remember, you are {assistant_name},"
-                        " If the user changes their mind or needs help for other tasks, call the CompleteOrEscalate function to let the primary host assistant take control."
-                        " Do not mention who you are - just act as the proxy for the assistant.",
+                        content=f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user.",
                         tool_call_id=tool_call_id,
                     )
             messages.append(message)
@@ -208,6 +218,11 @@ async def rag_assistant(state):
     
     return {"messages": [response]}
 
+async def multimedia_assistant(state):
+    user_input=state["user_input"]
+    response = await multimedia_agent.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
+
+    return {"messages":[response]}
 
 async def summarize_conversation(state: GraphState):
     # Get any existing summary
@@ -275,7 +290,7 @@ def route_primary_assistant(
 ) -> Literal[
     "enter_rag_assistant",
     "tools",
-    "summarize_conversation"
+    "summarize_conversation",
     "__end__",
 ]:
     route = tools_condition(state)
@@ -286,7 +301,7 @@ def route_primary_assistant(
     if tool_calls:
         if tool_calls[0]["name"] == tools.toRagAssistant.__name__:
             return "enter_rag_assistant"
-        elif tool_calls[0]["name"] == "create_event_test_drive":
+        else:
             return "tools"
     raise ValueError("Invalid route")
 
@@ -294,7 +309,7 @@ def route_to_workflow(
     state: GraphState,
 ) -> Literal[
     "primary_assistant",
-    "router_rag_assistant",
+    "router_rag_assistant"
 ]:
     """If we are in a delegated state, route directly to the appropriate assistant."""
     dialog_state = state.get("dialog_state")
@@ -309,23 +324,32 @@ def route_assistants(
     "summarize_conversation",
     "__end__",
 ]:
-    route = tools_condition(state)
-    if route == END:
-        summarize=should_summarize(state)
-        return summarize
-    tool_calls = state["messages"][-1].tool_calls
-    did_cancel = any(tc["name"] == tools.CompleteOrEscalate.__name__ for tc in tool_calls)
-    if did_cancel:
-        return "leave_skill"
+    #route = tools_condition(state)
+    #if route == END:
+    summarize=should_summarize(state)
+    return summarize
+    # tool_calls = state["messages"][-1].tool_calls
+    # did_cancel = any(tc["name"] == tools.CompleteOrEscalate.__name__ for tc in tool_calls)
+    # if did_cancel:
+    #     return "leave_skill"
     
-def route_rag_assistant(state:GraphState) -> Literal["leave_skill","graph_rag","rag_assistant"]:
+def route_rag_assistant(state:GraphState) -> Literal["leave_skill","graph_rag","rag_assistant","enter_multimedia_assistant"]:
     tool_calls = state["messages"][-1].tool_calls
     if tool_calls:
         if tool_calls[0]["name"] == tools.CompleteOrEscalate.__name__:
             return "leave_skill"
         elif tool_calls[0]["name"] == tools.QueryIdentifier.__name__:
             return "graph_rag"
+        elif tool_calls[0]["name"] ==tools.MultimediaIdentifier.__name__:
+            return "enter_multimedia_assistant"
     return "rag_assistant"
+
+def route_multimedia_assistant(state):
+    tool_calls=state["messages"][-1].tool_calls
+    if tool_calls:
+        return "tools_multimedia"
+    return should_summarize(state)
+
 # This node will be shared for exiting all specialized assistants
 def pop_dialog_state(state: GraphState) -> dict:
     """Pop the dialog stack and return to the main assistant.
@@ -360,25 +384,29 @@ workflow.add_conditional_edges(START,route_to_workflow)
 workflow.add_node("primary_assistant",primary_assistant)
 
 workflow.add_node("router_rag_assistant",rag_router)
-workflow.add_conditional_edges("router_rag_assistant", route_rag_assistant)
+workflow.add_conditional_edges(
+    "router_rag_assistant", 
+    route_rag_assistant,
+    )
 
 workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "router_rag_assistant"))  
 workflow.add_node("rag_assistant", rag_assistant)
 workflow.add_edge("enter_rag_assistant","router_rag_assistant")
 
-workflow.add_node("tools",ToolNode([tools.create_event_test_drive]))
+workflow.add_node("enter_multimedia_assistant",create_entry_node("Multimedia Assistant","router_rag_assistant"))
+workflow.add_edge("enter_multimedia_assistant","multimedia_assistant")
+
+workflow.add_node("multimedia_assistant",multimedia_assistant)
+workflow.add_node("tools_multimedia",ToolNode([tools.tool_get_car_technical_info]))
+workflow.add_edge("tools_multimedia","multimedia_assistant")
+workflow.add_conditional_edges("multimedia_assistant", route_multimedia_assistant)
+
+
+workflow.add_node("tools",ToolNode([tools.tool_create_event_test_drive]))
 workflow.add_edge("tools","primary_assistant")
 
-workflow.add_conditional_edges(
-    "primary_assistant",
-    route_primary_assistant,
-    {
-        "enter_rag_assistant": "enter_rag_assistant",
-        "tools": "tools",
-        "summarize_conversation":"summarize_conversation",
-        END: END,
-    },
-)
+
+workflow.add_conditional_edges("primary_assistant",route_primary_assistant)
 workflow.add_node("graph_rag",graph_rag)
 workflow.add_edge("graph_rag","rag_assistant")
 

@@ -12,7 +12,10 @@ from pydantic import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_core.tools import ToolException
 from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+#from .supabase_service import load_vehicle_brands_models,load_vehicle_info_by_id
 
+from supabase_service import load_vehicle_brands_models,load_vehicle_info_by_id
 # Autenticación y autorización
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -38,14 +41,7 @@ def get_calendar_service():
     return service
 service=get_calendar_service()
 
-class EventTestDrive(BaseModel):
-    car_model : str=Field("Nombre del modelo del vehiculo al que se le hara test drive")
-    name : str=Field(description="Es el nombre de quien va a hacer la cita")
-    lastname : str=Field(description="Es el apellido de quien va a hacer la cita")
-    email : str=Field(description="Es el correo electronico de quien va a hacer la cita")
-    date_begin : str=Field(description="Es la fecha en la cual se hará la cita. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -05:00. Por ejemplo  :  '2015-05-28T09:00:00-05:00'")
-    date_finish : str=Field(description="Es la fecha en la cual se acaba la cita. Es una hora despues de que empieza. Está en el formato ISO especificando la compensacion horaria con respecto al UTC -05:00. Por ejemplo : '2015-05-28T09:00:00-05:00'" )
-    notes : str=Field(description=" Notas adicionales que deja el usuario")
+
 
 def create_event_test_drive(car_model : str , name : str, lastname : str, email : str, date_begin :str ,date_finish :str,  notes="" ):
     
@@ -113,12 +109,56 @@ class toRagAssistant(BaseModel):
     Only give information about vehicles Los Coches have, never give information about another brand they don't sell.
     If general information about car concepts are asked, answer.
     """
-    request: str=Field(description="Any necessary follow-up questions the conceptual assistant  should clarify  before proceeding. The request must be related to the  car dealership 'los coches'. ")
-
+    request: str=Field(description="Any necessary follow-up questions the primary assistant  should clarify  before proceeding. The request must be related to the  car dealership 'los coches'. ")
+class toMultimediaAssistant(BaseModel):
+    """
+    Transfers work to a specialized assistant to extract the technical card and/or videos/images from a car model to handle any conceptual doubts/inquiries about the vehicles available OR schedule test drives.
+    """
+    request: str=Field(description="Any necessary follow-up questions the primary assistant  should clarify  before proceeding. The request must be related to the  car dealership 'los coches'. ")
 class QueryIdentifier(BaseModel):
     """Identify if the model needs to extract info from the vector database to answer the user and if it does, 
     it identifies if the user input is sufficient to search in the database. If not, then a follow-up question is asked"""
 
     query : str = Field(description=' query that is going to enter into the vector store to retrieve the information the user needs')
 
+class MultimediaIdentifier(BaseModel):
+    """ Identify if the model needs to extract any multimedia(technical cards, videos, images) given the user request"""
+    query : str = Field(description='query that is going to enter into the multimedia assistant')
+class CarModel(BaseModel):
+    id : int = Field (description = "Car id ")
+
+def get_car_technical_info(brand:str,model:str):
+    """
+    Obtiene la ficha tecnica y videos de un carro dado su modelo y marca
+    """
+    vehicles_info = load_vehicle_brands_models()
+    print("vehiculos cargados")
+    chat = ChatOpenAI(model="gpt-4o-mini", temperature=0).with_structured_output(CarModel)
+    SYSTEM = """"
+    Given a list of specyfications of a car (model, brand, id ) and a user brand and model, you must select
+    which one the user is referring to. Try to return the closest  answer.  If there is no close answer, dont return anything
+    ###
+    vehicles info : {vehicles_info}
+    ###
+    user brand : {brand}
+    ###
+    user model : {model}
+    """
+    prompt = ChatPromptTemplate.from_messages(
+        ("system",SYSTEM)
+    )
+    llm = prompt | chat
+
+    id=llm.invoke({"vehicles_info":vehicles_info, "brand":brand,"model":model}).id
+    print("id obtenido correctamente" ,id)
+    vehicle_info = load_vehicle_info_by_id(id)
+    print("info vehiculo obtenida correctamente")
+    return vehicle_info
+
+tool_get_car_technical_info=StructuredTool.from_function(
+    func=get_car_technical_info, 
+    name = "get_car_info", 
+    description="Obtiene la ficha tecnica y fotos/videos de un carro",
+    handle_tool_error=True)
+    
 
