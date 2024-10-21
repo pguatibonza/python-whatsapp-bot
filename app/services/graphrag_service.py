@@ -24,8 +24,8 @@ from graphrag.query.structured_search.local_search.mixed_context import (
 from graphrag.query.structured_search.local_search.search import LocalSearch
 from graphrag.vector_stores.lancedb import LanceDBVectorStore
 
-#INPUT_DIR = "./ragtest/output"
-INPUT_DIR = "../../ragtest/output"
+INPUT_DIR = "./ragtest/output"
+#INPUT_DIR = "../../ragtest/output"
 LANCEDB_URI = f"{INPUT_DIR}/lancedb"
 
 COMMUNITY_REPORT_TABLE = "create_final_community_reports"
