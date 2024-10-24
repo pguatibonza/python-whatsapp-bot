@@ -1,0 +1,334 @@
+
+-Goal-
+Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
+
+-Steps-
+1. Identify all entities. For each identified entity, extract the following information:
+- entity_name: Name of the entity, capitalized
+- entity_type: One of the following types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+- entity_description: Comprehensive description of the entity's attributes and activities
+Format each entity as ("entity"{tuple_delimiter}<entity_name>{tuple_delimiter}<entity_type>{tuple_delimiter}<entity_description>)
+
+2. From the entities identified in step 1, identify all pairs of (source_entity, target_entity) that are *clearly related* to each other.
+For each pair of related entities, extract the following information:
+- source_entity: name of the source entity, as identified in step 1
+- target_entity: name of the target entity, as identified in step 1
+- relationship_description: explanation as to why you think the source entity and the target entity are related to each other
+- relationship_strength: an integer score between 1 to 10, indicating strength of the relationship between the source entity and target entity
+Format each relationship as ("relationship"{tuple_delimiter}<source_entity>{tuple_delimiter}<target_entity>{tuple_delimiter}<relationship_description>{tuple_delimiter}<relationship_strength>)
+
+3. Return output in The primary language of the provided text is "Spanish". as a single list of all the entities and relationships identified in steps 1 and 2. Use **{record_delimiter}** as the list delimiter.
+
+4. If you have to translate into The primary language of the provided text is "Spanish"., just translate the descriptions, nothing else!
+
+5. When finished, output {completion_delimiter}.
+
+-Examples-
+######################
+
+Example 1:
+
+entity_types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+text:
+Audi Q8 55 TFSI quattro MHEV Progressive - Ficha Técnica Completa - Modelo 2024
+
+Precio inicial:
+- Audi Q8 55 TFSI quattro MHEV Progressive: $409.900.000
+
+---
+
+### Motor y Transmisión
+
+**Motor**:
+- Tipo de motor: Seis cilindros en "V" con sistema de hibridación ligera (MHEV) de 48V
+- Cilindrada: 2.995 cc
+- Potencia máxima: 340 HP @ 5.000 - 6.400 rpm
+- Torque máximo: 500 Nm @ 1.370 - 4.500 rpm
+- Combustible: Gasolina Premium
+- Inducción: Turbocargada
+- Inyección directa TFSI
+
+**Transmisión**:
+- Tipo: Tiptronic de 8 velocidades
+- Tracción: quattro® permanente con diferencial central autoblocante
+
+---
+
+### Desempeño
+
+- Aceleración (0 a 100 km/h): 5.9 segundos
+- Velocidad máxima: 250 km/h
+
+---
+
+### Dimensiones y Capacidades
+
+- Longitud: 4.986 mm
+- Ancho con espejos: 2.190 mm
+- Alto: 1.705 mm
+- Capacidad del baúl: 605 L (con asientos abatidos: 1.755 L)
+- Peso en vacío: 2.220 kg
+- Capacidad del tanque de combustible: 22,4 galones
+
+---
+
+### Suspensión y Frenos
+
+- Suspensión delantera: Multi-link independiente
+- Suspensión trasera: Multi-link independiente
+- Frenos delanteros: Discos ventilados
+- Frenos traseros: Discos ventilados
+
+---
+
+### Seguridad
+
+- Airbags frontales para conductor y acompañante
+- Airbags laterales de tórax y cadera delanteros y traseros
+- Airbags de cortina
+- Sistema de frenos ABS con EBD y asistencia de frenado
+- Control de estabilidad (ESC) y control de tracción (ASR)
+- Alerta de colisión frontal
+- Sistema avanzado de frenado de emergencia
+- Sistema de monitoreo de presión de neumáticos
+- Sistema antirrobo con inmovilizador electrónico
+- Anclajes para asientos infantiles ISOFIX
+- Rueda de repuesto
+
+---
+
+### Confort y Equipamiento
+
+**Asientos**:
+- Asientos delanteros Comfort con ajuste eléctrico y memoria para el conductor
+- Apoyo lumbar con ajuste eléctrico
+- Tapizado en cuero/mono.pur con paquete de cuero extendido
+- Asientos traseros independientes, ajustables y abatibles
+
+**Climatización**:
+- Aire acondicionado automático de 4 zonas
+
+**Tecnología de asistencia al conductor**:
+- Audi Park Assist con dirección asistida
+- Sensores de parqueo delanteros y traseros
+- Cámara de reversa
+- Sensor de luz y lluvia
+- Asistencia en arrancada
+- Audi Keyless Go (Botón Start/Stop)
+- Audi Keyless Access
+- Audi Drive Select (Modos de manejo)
+- Audi Start-Stop
+
+---
+
+### Entretenimiento e Información
+
+- MMI Plus con mandos hápticos
+- Sistema de sonido Bang & Olufsen 3D con 17 altavoces y 730 watts
+- Dos pantallas a color de alta resolución de 10,1" y 8.6"
+- Audi Virtual Cockpit (computador a bordo)
+- Control de voz
+- Interfaz Bluetooth
+- Conectividad con Audi Music y Audi Smartphone Interface
+
+---
+
+### Diseño Exterior
+
+- Paquete exterior de alto brillo
+- Faros Full LED con lavafaros y asistente de luces de carretera
+- Luces traseras LED
+- Retrovisores exteriores abatibles eléctricamente, térmicos, antideslumbrantes automáticos con memoria
+- Barras longitudinales del techo en aluminio anodizado
+- Apertura y cierre de baúl eléctrico con función de apertura por patada
+- Parachoques en color de la carrocería
+- Rines de 21" en diseño de 5 brazos en "W", en contraste gris
+- Llantas: 285/45 R21 113Y XL
+
+---
+
+### Interior y Otros Detalles
+
+- Volante multifuncional plus en cuero de 3 radios con levas de cambio
+- Retrovisor interior sin marco, con antideslumbrante automático
+- Freno de mano electromecánico con asistente de arranque en pendiente
+- Apoyabrazos delantero Comfort ajustable longitudinalmente con portaobjetos
+- Apoyabrazos trasero con portavasos
+- Molduras interiores en acabado diamante color gris plata
+- Iluminación de ambiente Plus con 30 colores disponibles
+- Techo de cristal panorámico con accionamiento eléctrico
+
+------------------------
+output:
+("entity"{tuple_delimiter}AUDI Q8 55 TFSI QUATTRO MHEV PROGRESSIVE{tuple_delimiter}vehicle_model{tuple_delimiter}Modelo 2024 del Audi Q8 con un sistema de hibridación ligera y tracción quattro permanente)
+{record_delimiter}
+("entity"{tuple_delimiter}SEIS CILINDROS EN V CON SISTEMA DE HIBRIDACIÓN LIGERA (MHEV) DE 48V{tuple_delimiter}engine{tuple_delimiter}Motor de 2.995 cc con 340 HP y 500 Nm de torque, utiliza gasolina premium y tiene inducción turbocargada e inyección directa TFSI)
+{record_delimiter}
+("entity"{tuple_delimiter}TIPTRONIC DE 8 VELOCIDADES{tuple_delimiter}transmission{tuple_delimiter}Transmisión automática de 8 velocidades con tracción quattro permanente y diferencial central autoblocante)
+{record_delimiter}
+("entity"{tuple_delimiter}ACELERACIÓN (0 A 100 KM/H): 5.9 SEGUNDOS{tuple_delimiter}performance{tuple_delimiter}El vehículo acelera de 0 a 100 km/h en 5.9 segundos)
+{record_delimiter}
+("entity"{tuple_delimiter}VELOCIDAD MÁXIMA: 250 KM/H{tuple_delimiter}performance{tuple_delimiter}La velocidad máxima del vehículo es de 250 km/h)
+{record_delimiter}
+("entity"{tuple_delimiter}LONGITUD: 4.986 MM{tuple_delimiter}dimensions{tuple_delimiter}La longitud total del vehículo es de 4.986 mm)
+{record_delimiter}
+("entity"{tuple_delimiter}ANCHO CON ESPEJOS: 2.190 MM{tuple_delimiter}dimensions{tuple_delimiter}El ancho del vehículo con espejos es de 2.190 mm)
+{record_delimiter}
+("entity"{tuple_delimiter}ALTO: 1.705 MM{tuple_delimiter}dimensions{tuple_delimiter}La altura del vehículo es de 1.705 mm)
+{record_delimiter}
+("entity"{tuple_delimiter}CAPACIDAD DEL BAÚL: 605 L (CON ASIENTOS ABATIDOS: 1.755 L){tuple_delimiter}dimensions{tuple_delimiter}El baúl tiene una capacidad de 605 litros, ampliable a 1.755 litros con los asientos abatidos)
+{record_delimiter}
+("entity"{tuple_delimiter}PESO EN VACÍO: 2.220 KG{tuple_delimiter}dimensions{tuple_delimiter}El peso en vacío del vehículo es de 2.220 kg)
+{record_delimiter}
+("entity"{tuple_delimiter}CAPACIDAD DEL TANQUE DE COMBUSTIBLE: 22,4 GALONES{tuple_delimiter}dimensions{tuple_delimiter}El tanque de combustible tiene una capacidad de 22,4 galones)
+{record_delimiter}
+("entity"{tuple_delimiter}SUSPENSIÓN DELANTERA: MULTI-LINK INDEPENDIENTE{tuple_delimiter}suspension{tuple_delimiter}La suspensión delantera es de tipo multi-link independiente)
+{record_delimiter}
+("entity"{tuple_delimiter}SUSPENSIÓN TRASERA: MULTI-LINK INDEPENDIENTE{tuple_delimiter}suspension{tuple_delimiter}La suspensión trasera es de tipo multi-link independiente)
+{record_delimiter}
+("entity"{tuple_delimiter}FRENOS DELANTEROS: DISCOS VENTILADOS{tuple_delimiter}brakes{tuple_delimiter}Los frenos delanteros son de discos ventilados)
+{record_delimiter}
+("entity"{tuple_delimiter}FRENOS TRASEROS: DISCOS VENTILADOS{tuple_delimiter}brakes{tuple_delimiter}Los frenos traseros son de discos ventilados)
+{record_delimiter}
+("entity"{tuple_delimiter}AIRBAGS FRONTALES PARA CONDUCTOR Y ACOMPAÑANTE{tuple_delimiter}safety_features{tuple_delimiter}Airbags frontales para el conductor y el acompañante)
+{record_delimiter}
+("entity"{tuple_delimiter}AIRBAGS LATERALES DE TÓRAX Y CADERA DELANTEROS Y TRASEROS{tuple_delimiter}safety_features{tuple_delimiter}Airbags laterales para tórax y cadera en las filas delantera y trasera)
+{record_delimiter}
+("entity"{tuple_delimiter}AIRBAGS DE CORTINA{tuple_delimiter}safety_features{tuple_delimiter}Airbags de cortina para protección lateral)
+{record_delimiter}
+("entity"{tuple_delimiter}SISTEMA DE FRENOS ABS CON EBD Y ASISTENCIA DE FRENADO{tuple_delimiter}safety_features{tuple_delimiter}Sistema de frenos ABS con distribución electrónica de frenado y asistencia de frenado)
+{record_delimiter}
+("entity"{tuple_delimiter}CONTROL DE ESTABILIDAD (ESC) Y CONTROL DE TRACCIÓN (ASR){tuple_delimiter}safety_features{tuple_delimiter}Sistema de control de estabilidad y control de tracción)
+{record_delimiter}
+("entity"{tuple_delimiter}ALERTA DE COLISIÓN FRONTAL{tuple_delimiter}safety_features{tuple_delimiter}Sistema de alerta de colisión frontal)
+{record_delimiter}
+("entity"{tuple_delimiter}SISTEMA AVANZADO DE FRENADO DE EMERGENCIA{tuple_delimiter}safety_features{tuple_delimiter}Sistema avanzado para frenado de emergencia)
+{record_delimiter}
+("entity"{tuple_delimiter}SISTEMA DE MONITOREO DE PRESIÓN DE NEUMÁTICOS{tuple_delimiter}safety_features{tuple_delimiter}Sistema para monitorear la presión de los neumáticos)
+{record_delimiter}
+("entity"{tuple_delimiter}SISTEMA ANTIRROBO CON INMOVILIZADOR ELECTRÓNICO{tuple_delimiter}safety_features{tuple_delimiter}Sistema antirrobo con inmovilizador electrónico)
+{record_delimiter}
+("entity"{tuple_delimiter}ANCLAJES PARA ASIENTOS INFANTILES ISOFIX{tuple_delimiter}safety_features{tuple_delimiter}Anclajes ISOFIX para asientos infantiles)
+{record_delimiter}
+("entity"{tuple_delimiter}RUEDA DE REPUESTO{tuple_delimiter}safety_features{tuple_delimiter}Rueda de repuesto incluida)
+{record_delimiter}
+("entity"{tuple_delimiter}ASIENTOS DELANTEROS COMFORT CON AJUSTE ELÉCTRICO Y MEMORIA PARA EL CONDUCTOR{tuple_delimiter}comfort_features{tuple_delimiter}Asientos delanteros con ajuste eléctrico y memoria para el conductor)
+{record_delimiter}
+("entity"{tuple_delimiter}APOYO LUMBAR CON AJUSTE ELÉCTRICO{tuple_delimiter}comfort_features{tuple_delimiter}Apoyo lumbar con ajuste eléctrico)
+{record_delimiter}
+("entity"{tuple_delimiter}TAPIZADO EN CUERO/MONO.PUR CON PAQUETE DE CUERO EXTENDIDO{tuple_delimiter}comfort_features{tuple_delimiter}Tapizado en cuero/mono.pur con paquete de cuero extendido)
+{record_delimiter}
+("entity"{tuple_delimiter}ASIENTOS TRASEROS INDEPENDIENTES, AJUSTABLES Y ABATIBLES{tuple_delimiter}comfort_features{tuple_delimiter}Asientos traseros independientes, ajustables y abatibles)
+{record_delimiter}
+("entity"{tuple_delimiter}AIRE ACONDICIONADO AUTOMÁTICO DE 4 ZONAS{tuple_delimiter}comfort_features{tuple_delimiter}Sistema de aire acondicionado automático de 4 zonas)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI PARK ASSIST CON DIRECCIÓN ASISTIDA{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema de asistencia de parqueo con dirección asistida)
+{record_delimiter}
+("entity"{tuple_delimiter}SENSORES DE PARQUEO DELANTEROS Y TRASEROS{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sensores de parqueo ubicados en la parte delantera y trasera)
+{record_delimiter}
+("entity"{tuple_delimiter}CÁMARA DE REVERSA{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Cámara de reversa para asistencia al estacionar)
+{record_delimiter}
+("entity"{tuple_delimiter}SENSOR DE LUZ Y LLUVIA{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sensor que detecta luz y lluvia para ajustar automáticamente las luces y limpiaparabrisas)
+{record_delimiter}
+("entity"{tuple_delimiter}ASISTENCIA EN ARRANCADA{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema de asistencia para arrancar en pendientes)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI KEYLESS GO (BOTÓN START/STOP){tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema de arranque sin llave con botón Start/Stop)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI KEYLESS ACCESS{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema de acceso sin llave)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI DRIVE SELECT (MODOS DE MANEJO){tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema que permite seleccionar diferentes modos de manejo)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI START-STOP{tuple_delimiter}driver_assistance_technology{tuple_delimiter}Sistema de arranque y parada automática del motor)
+{record_delimiter}
+("entity"{tuple_delimiter}MMI PLUS CON MANDOS HÁPTICOS{tuple_delimiter}entertainment_system{tuple_delimiter}Sistema de información y entretenimiento MMI Plus con controles hápticos)
+{record_delimiter}
+("entity"{tuple_delimiter}SISTEMA DE SONIDO BANG & OLUFSEN 3D CON 17 ALTAVOCES Y 730 WATTS{tuple_delimiter}entertainment_system{tuple_delimiter}Sistema de sonido premium Bang & Olufsen 3D con 17 altavoces y 730 watts de potencia)
+{record_delimiter}
+("entity"{tuple_delimiter}DOS PANTALLAS A COLOR DE ALTA RESOLUCIÓN DE 10,1" Y 8.6"{tuple_delimiter}entertainment_system{tuple_delimiter}Dos pantallas a color de alta resolución de 10,1 pulgadas y 8.6 pulgadas)
+{record_delimiter}
+("entity"{tuple_delimiter}AUDI VIRTUAL COCKPIT (COMPUTADOR A BORDO){tuple_delimiter}entertainment_system{tuple_delimiter}Computador a bordo Audi Virtual Cockpit)
+{record_delimiter}
+("entity"{tuple_delimiter}CONTROL DE VOZ{tuple_delimiter}entertainment_system{tuple_delimiter}Sistema de control de voz para operar funciones del vehículo)
+{record_delimiter}
+("entity"{tuple_delimiter}INTERFAZ BLUETOOTH{tuple_delimiter}entertainment_system{tuple_delimiter}Interfaz Bluetooth para conectividad inalámbrica)
+{record_delimiter}
+("entity"{tuple_delimiter}CONECTIVIDAD CON AUDI MUSIC Y AUDI SMARTPHONE INTERFACE{tuple_delimiter}entertainment_system{tuple_delimiter}Conectividad con Audi Music y Audi Smartphone Interface)
+{record_delimiter}
+("entity"{tuple_delimiter}PAQUETE EXTERIOR DE ALTO BRILLO{tuple_delimiter}exterior_design{tuple_delimiter}Paquete exterior que incluye acabados de alto brillo)
+{record_delimiter}
+("entity"{tuple_delimiter}FAROS FULL LED CON LAVAFAROS Y ASISTENTE DE LUCES DE CARRETERA{tuple_delimiter}exterior_design{tuple_delimiter}Faros Full LED con lavafaros y asistente de luces de carretera)
+{record_delimiter}
+("entity"{tuple_delimiter}LUCES TRASERAS LED{tuple_delimiter}exterior_design{tuple_delimiter}Luces traseras LED)
+{record_delimiter}
+("entity"{tuple_delimiter}RETROVISORES EXTERIORES ABATIBLES ELÉCTRICAMENTE, TÉRMICOS, ANTIDESLUMBRANTES AUTOMÁTICOS CON MEMORIA{tuple_delimiter}exterior_design{tuple_delimiter}Retrovisores exteriores con funciones eléctricas, térmicas y antideslumbrantes automáticas con memoria)
+{record_delimiter}
+("entity"{tuple_delimiter}BARRAS LONGITUDINALES DEL TECHO EN ALUMINIO ANODIZADO{tuple_delimiter}exterior_design{tuple_delimiter}Barras longitudinales del techo en aluminio anodizado)
+{record_delimiter}
+("entity"{tuple_delimiter}APERTURA Y CIERRE DE BAÚL ELÉCTRICO CON FUNCIÓN DE APERTURA POR PATADA{tuple_delimiter}exterior_design{tuple_delimiter}Sistema de apertura y cierre eléctrico del baúl con función de apertura por patada)
+{record_delimiter}
+("entity"{tuple_delimiter}PARACHOQUES EN COLOR DE LA CARROCERÍA{tuple_delimiter}exterior_design{tuple_delimiter}Parachoques pintados en el color de la carrocería)
+{record_delimiter}
+("entity"{tuple_delimiter}RINES DE 21" EN DISEÑO DE 5 BRAZOS EN "W", EN CONTRASTE GRIS{tuple_delimiter}exterior_design{tuple_delimiter}Rines de 21 pulgadas en diseño de 5 brazos en "W", en contraste gris)
+{record_delimiter}
+("entity"{tuple_delimiter}LLANTAS: 285/45 R21 113Y XL{tuple_delimiter}exterior_design{tuple_delimiter}Llantas de medida 285/45 R21 113Y XL)
+{record_delimiter}
+("entity"{tuple_delimiter}VOLANTE MULTIFUNCIONAL PLUS EN CUERO DE 3 RADIOS CON LEVAS DE CAMBIO{tuple_delimiter}interior_design{tuple_delimiter}Volante multifuncional en cuero de 3 radios con levas de cambio)
+{record_delimiter}
+("entity"{tuple_delimiter}RETROVISOR INTERIOR SIN MARCO, CON ANTIDESLUMBRANTE AUTOMÁTICO{tuple_delimiter}interior_design{tuple_delimiter}Retrovisor interior sin marco con función antideslumbrante automática)
+{record_delimiter}
+("entity"{tuple_delimiter}FRENO DE MANO ELECTROMECÁNICO CON ASISTENTE DE ARRANQUE EN PENDIENTE{tuple_delimiter}interior_design{tuple_delimiter}Freno de mano electromecánico con asistente de arranque en pendiente)
+{record_delimiter}
+("entity"{tuple_delimiter}APOYABRAZOS DELANTERO COMFORT AJUSTABLE LONGITUDINALMENTE CON PORTAOBJETOS{tuple_delimiter}interior_design{tuple_delimiter}Apoyabrazos delantero ajustable longitudinalmente con portaobjetos)
+{record_delimiter}
+("entity"{tuple_delimiter}APOYABRAZOS TRASERO CON PORTAVASOS{tuple_delimiter}interior_design{tuple_delimiter}Apoyabrazos trasero con portavasos)
+{record_delimiter}
+("entity"{tuple_delimiter}MOLDURAS INTERIORES EN ACABADO DIAMANTE COLOR GRIS PLATA{tuple_delimiter}interior_design{tuple_delimiter}Molduras interiores en acabado diamante color gris plata)
+{record_delimiter}
+("entity"{tuple_delimiter}ILUMINACIÓN DE AMBIENTE PLUS CON 30 COLORES DISPONIBLES{tuple_delimiter}interior_design{tuple_delimiter}Iluminación de ambiente Plus con 30 colores disponibles)
+{record_delimiter}
+("entity"{tuple_delimiter}TECHO DE CRISTAL PANORÁMICO CON ACCIONAMIENTO ELÉCTRICO{tuple_delimiter}interior_design{tuple_delimiter}Techo de cristal panorámico con accionamiento eléctrico)
+{completion_delimiter}
+#############################
+
+
+Example 2:
+
+entity_types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+text:
+ Elevavidrios eléctricos con función one-touch para el conductor en versiones superiores
+  - Asistente de arranque en pendiente disponible a partir de la versión Zen
+
+- **Seguridad**:
+  - Control de estabilidad (ESC) y control de tracción (ASR) disponibles a partir de Life+
+  - Airbags laterales incorporados a partir de la versión Zen
+
+---
+
+------------------------
+output:
+("entity"{tuple_delimiter}ELEVAVIDRIOS ELÉCTRICOS{tuple_delimiter}COMFORT_FEATURES{tuple_delimiter}Elevavidrios eléctricos con función one-touch para el conductor en versiones superiores)
+{record_delimiter}
+("entity"{tuple_delimiter}ASISTENTE DE ARRANQUE EN PENDIENTE{tuple_delimiter}DRIVER_ASSISTANCE_TECHNOLOGY{tuple_delimiter}Asistente de arranque en pendiente disponible a partir de la versión Zen)
+{record_delimiter}
+("entity"{tuple_delimiter}CONTROL DE ESTABILIDAD (ESC){tuple_delimiter}SAFETY_FEATURES{tuple_delimiter}Control de estabilidad disponible a partir de Life+)
+{record_delimiter}
+("entity"{tuple_delimiter}CONTROL DE TRACCIÓN (ASR){tuple_delimiter}SAFETY_FEATURES{tuple_delimiter}Control de tracción disponible a partir de Life+)
+{record_delimiter}
+("entity"{tuple_delimiter}AIRBAGS LATERALES{tuple_delimiter}SAFETY_FEATURES{tuple_delimiter}Airbags laterales incorporados a partir de la versión Zen)
+{record_delimiter}
+("relationship"{tuple_delimiter}ELEVAVIDRIOS ELÉCTRICOS{tuple_delimiter}ASISTENTE DE ARRANQUE EN PENDIENTE{tuple_delimiter}Ambos son características disponibles en versiones superiores del vehículo{tuple_delimiter}5)
+{record_delimiter}
+("relationship"{tuple_delimiter}CONTROL DE ESTABILIDAD (ESC){tuple_delimiter}CONTROL DE TRACCIÓN (ASR){tuple_delimiter}Ambos son características de seguridad disponibles a partir de Life+{tuple_delimiter}8)
+{record_delimiter}
+("relationship"{tuple_delimiter}ASISTENTE DE ARRANQUE EN PENDIENTE{tuple_delimiter}AIRBAGS LATERALES{tuple_delimiter}Ambos están disponibles a partir de la versión Zen{tuple_delimiter}6)
+{completion_delimiter}
+#############################
+
+
+
+-Real Data-
+######################
+entity_types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+text: {input_text}
+######################
+output:
