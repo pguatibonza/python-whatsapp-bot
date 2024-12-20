@@ -14,6 +14,15 @@ def load_configurations(app):
     app.config["VERSION"] = os.getenv("VERSION")
     app.config["PHONE_NUMBER_ID"] = os.getenv("PHONE_NUMBER_ID")
     app.config["VERIFY_TOKEN"] = os.getenv("VERIFY_TOKEN")
+    app.config["DB_CONNECTION"] = os.getenv("DB_CONNECTION")
+    app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+    app.config["SUPABASE_URL"] = os.getenv("SUPABASE_URL")
+    app.config["SUPABASE_KEY"] = os.getenv("SUPABASE_KEY")
+    app.config["TABLE_NAME"] = os.getenv("TABLE_NAME")
+    app.config["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT")
+    app.config["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
+    app.config["LANGCHAIN_TRACING_V2"]=os.getenv("LANGCHAIN_TRACING_V2")
+    app.config["TABLE_NAME_VEHICLES"]=os.getenv("TABLE_NAME_VEHICLES")
 
 
 def configure_logging():

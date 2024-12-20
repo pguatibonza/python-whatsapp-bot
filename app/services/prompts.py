@@ -51,7 +51,7 @@ You will have the following tools at hand:
 
     Returns:
         bool: True if the time slot is available, False otherwise.
-3. * Create event test drive* Create a test drive appointment for a car.
+3. * Create event test drive* Create a test drive appointment for a car. The appointments lasts 1 hour exactly. 
     Args:
         car_model (str): The car model for the test drive.
         name (str): The first name of the customer.
@@ -65,6 +65,8 @@ You will have the following tools at hand:
     Raises:
         ValueError: If the time slot is not available.
 Important : You must also send the confirmation link to the user
+You cannot make appointments to the past
+
 Current time = {time}
 
 Conversation Summary= {summary}

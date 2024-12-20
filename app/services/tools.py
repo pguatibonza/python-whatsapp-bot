@@ -1,7 +1,5 @@
 import os
 import pickle
-from typing import Literal, Optional
-import google.auth
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -10,10 +8,9 @@ from dotenv import load_dotenv
 import os
 from pydantic import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
-from langchain_core.tools import ToolException
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from .supabase_service import load_vehicle_brands_models,load_vehicle_info_by_id
+from .supabase_service import SupabaseService
 
 #from supabase_service import load_vehicle_brands_models,load_vehicle_info_by_id
 # Autenticación y autorización
@@ -42,9 +39,9 @@ def get_calendar_service():
 service=get_calendar_service()
 
 
-ATTENDEES=["pabloalejandrogb1@gmail.com","p.guatibonza@uniandes.edu.co","andrew.molina.m@gmail.com"]
+WORKERS=["pabloalejandrogb1@gmail.com","p.guatibonza@uniandes.edu.co","andrew.molina.m@gmail.com"]
 WORKING_HOURS = (8, 17)
-MAX_APPOINTMENTS_PER_SLOT = len(ATTENDEES)
+MAX_APPOINTMENTS_PER_SLOT = len(WORKERS)
 
 def get_available_time_slots(date: str):
     """
@@ -141,7 +138,7 @@ def assign_available_worker(date: str, time_slot: str):
         if 'attendees' in event:
             current_appointments.extend([att['email'] for att in event['attendees'] if 'email' in att])
 
-    for worker in ATTENDEES:
+    for worker in WORKERS:
         if worker not in current_appointments:
             return worker
     raise ValueError(f"No workers are available for the time slot {time_slot} on {date}.")
@@ -255,7 +252,7 @@ def get_car_technical_info(brand:str,model:str):
     """
     Obtiene la ficha tecnica y videos de un carro dado su modelo y marca
     """
-    vehicles_info = load_vehicle_brands_models()
+    vehicles_info = SupabaseService.load_vehicle_brands_models()
     print("vehiculos cargados")
     chat = ChatOpenAI(model="gpt-4o-mini", temperature=0).with_structured_output(CarModel)
     SYSTEM = """"
@@ -275,7 +272,7 @@ def get_car_technical_info(brand:str,model:str):
 
     id=llm.invoke({"vehicles_info":vehicles_info, "brand":brand,"model":model}).id
     print("id obtenido correctamente" ,id)
-    vehicle_info = load_vehicle_info_by_id(id)
+    vehicle_info = SupabaseService.load_vehicle_info_by_id(id)
     print("info vehiculo obtenida correctamente")
     return vehicle_info
 
