@@ -71,7 +71,7 @@ main_agent=prompt | agent
 ###Appointment Assistant
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
-agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.tool_get_available_time_slots,tools.tool_is_time_slot_available])
+agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.tool_get_available_time_slots,tools.tool_is_time_slot_available,tools.CompleteOrEscalate])
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -252,22 +252,23 @@ async def rag_router(state):
     
     user_input=state["user_input"]
     response=await context_router.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
-    
+    response.content=""
     logging.debug(f"Tool called : {response}")
     return {"messages" : [response]}
 
 
 async def graph_rag(state):
     logging.debug("Entering graph rag node")
-
-    tool_call=state["messages"][-1].tool_calls[0]
-    tool_call_id=tool_call["id"]
-    query=tool_call["args"]["query"]
-    message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
-
-    response = await search_engine.asearch(query)
-    logging.debug(f"Response from graph rag : {response.response}")
-    return {"context":response.response,"messages":[message]}
+    final_response=""
+    #TO-DO implementar en demas tools
+    for tool_call in state["messages"][-1].tool_calls:
+        tool_call_id=tool_call["id"]
+        query=tool_call["args"]["query"]
+        message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
+        response = await search_engine.asearch(query)
+        final_response+=response.response
+    logging.debug(f"Response from graph rag : {final_response}")
+    return {"context":final_response,"messages":[message]}
 
 async def rag_assistant(state):
     logging.debug("Entering rag answering node")
@@ -420,6 +421,8 @@ def route_multimedia_assistant(state):
 def route_appointment_assistant(state):
     tool_calls=state["messages"][-1].tool_calls
     if tool_calls:
+        if tool_calls[0]["name"]==tools.CompleteOrEscalate.__name__:
+            return "leave_skill"
         return "tools_appointment"
     return should_summarize(state)
 
@@ -464,7 +467,7 @@ workflow.add_node("appointment_assistant",appointment_assistant)
 workflow.add_conditional_edges("appointment_assistant",route_appointment_assistant)
 
 workflow.add_edge("enter_appointment_assistant","appointment_assistant")
-workflow.add_node("tools_appointment",ToolNode([tools.tool_create_event_test_drive,tools.tool_is_time_slot_available,tools.tool_get_available_time_slots]))
+workflow.add_node("tools_appointment",ToolNode([tools.tool_create_event_test_drive,tools.tool_is_time_slot_available,tools.tool_get_available_time_slots,tools.CompleteOrEscalate]))
 workflow.add_edge("tools_appointment","appointment_assistant")
 
 #Router rag

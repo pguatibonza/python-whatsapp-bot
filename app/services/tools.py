@@ -237,11 +237,11 @@ class toAppointmentAssistant(BaseModel):
     """
     request: str=Field(description="Any necessary follow-up question the primary assistant should clarify before proceeding")
 class QueryIdentifier(BaseModel):
-    """Identify if the model needs to extract info from the vector database to answer the user and if it does, 
-    it identifies if the user input is sufficient to search in the database. If not, then a follow-up question is asked"""
-
-    query : str = Field(description=' query that is going to enter into the vector store to retrieve the information the user needs')
-
+    """Identifies if vector database access is needed. When creating the query:
+    - Maintain context from previous interactions
+    - Combine previous context with new request parameters"""
+    
+    query: str = Field(description="Precise search string combining current request with specific entities from conversation history. Example: 'Price of ModelX, ModelY' when following up on previous model list")
 class MultimediaIdentifier(BaseModel):
     """ Identify if the model needs to extract any multimedia(technical cards, videos, images) given the user request"""
     query : str = Field(description='query that is going to enter into the multimedia assistant')
