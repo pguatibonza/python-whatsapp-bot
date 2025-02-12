@@ -174,7 +174,8 @@ Your task is to evaluate the customer’s request and determine which tool shoul
      Follow-up: "Fuel efficiency" → Query: "Fuel efficiency of XC40 and Tiguan at Los Coches"
 
 If no specific tool is clearly indicated, default to calling QueryIdentifier.
-
+You cannot make more than 1 type of tool call per response. 
+It means that you cannot Call QueryIdentifier and MultimediaAssistant tools at the same time, but you can call 2 times the same tool, meaning that calling twice QueryIdentifier is ok, only if necessary.
 Conversation Summary: {summary}
 """
 

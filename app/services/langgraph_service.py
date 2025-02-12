@@ -262,11 +262,13 @@ async def graph_rag(state):
     final_response=""
     #TO-DO implementar en demas tools
     for tool_call in state["messages"][-1].tool_calls:
-        tool_call_id=tool_call["id"]
-        query=tool_call["args"]["query"]
-        message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
-        response = await search_engine.asearch(query)
-        final_response+=response.response
+        if tool_call["name"]==tools.QueryIdentifier.__name__:
+            tool_call_id=tool_call["id"]
+            query=tool_call["args"]["query"]
+            message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
+            response = await search_engine.asearch(query)
+            final_response+=response.response
+    
     logging.debug(f"Response from graph rag : {final_response}")
     return {"context":final_response,"messages":[message]}
 
