@@ -9,92 +9,157 @@ import logging
 from langchain_community.document_loaders import DirectoryLoader, UnstructuredFileLoader
 from langchain.indexes import SQLRecordManager, index
 from langchain_experimental.text_splitter import SemanticChunker
+from quart import current_app
 
-# Cargar variables de entorno
-load_dotenv()
+class SupabaseService:
+    """
+    Class to manage the connection and operations with Supabase.
+    Ensures that the client is initialized only once and reused.
+    """
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-TABLE_NAME=os.getenv("TABLE_NAME")
-TABLE_NAME_VEHICLES=os.getenv("TABLE_NAME_VEHICLES")
-embeddings=OpenAIEmbeddings()
+    _client: Client = None
 
-# Crear cliente de Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-print(f"Supabase client initialized: {supabase}")
+    @classmethod
+    def get_client(cls) -> Client:
+        """
+        Returns a singleton instance of the Supabase client.
+        If it doesn't exist, it creates and stores it for reuse.
 
-#Crear indice para evitar duplicados
-namespace=f"concesionarios/los-coches/{TABLE_NAME}"
-record_manager=SQLRecordManager(namespace,db_url="sqlite:///record_manager_cache.sql")
-#Must do when creating the index for the first time
-# record_manager.create_schema()
+        Returns:
+            Client: Supabase client instance.
+        """
+        if cls._client is None:
+            logging.info("Initializing Supabase client for the first time...")
+            supabase_url = current_app.config["SUPABASE_URL"]
+            supabase_key = current_app.config["SUPABASE_KEY"]
+            cls._client = create_client(supabase_url, supabase_key)
+            logging.info("Supabase client initialized successfully.")
+        return cls._client
 
+    @classmethod
+    def load_vector_store(cls) -> SupabaseVectorStore:
+        """
+        Loads the vector store from the Supabase database.
 
-def clean_data(documents):
-    for document in documents:
-        document.page_content=document.page_content.replace("\u0000","")
-    return documents
+        Returns:
+            SupabaseVectorStore: Initialized vector store.
+        """
+        table_name = current_app.config["TABLE_NAME"]
+        supabase = cls.get_client()
+        embeddings = OpenAIEmbeddings()
+        return SupabaseVectorStore(
+            embedding=embeddings,
+            table_name=table_name,
+            client=supabase,
+            query_name="match_documents",
+        )
 
-#Carga el vector store de la base de datos
-def load_vector_store():
-    vector_store = SupabaseVectorStore(
-        embedding=embeddings,
-        table_name=TABLE_NAME,
-        client=supabase,
-        query_name="match_documents",
-    )
-    return vector_store
+    @classmethod
+    def load_vehicle_brands_models(cls) -> list[dict]:
+        """
+        Loads vehicle brands and models from the database.
 
+        Returns:
+            list[dict]: List of vehicle brands and models.
+        """
+        table_name_vehicles = current_app.config["TABLE_NAME_VEHICLES"]
+        supabase = cls.get_client()
+        try:
+            response = supabase.table(table_name_vehicles).select('marca, modelo, id').execute()
+            logging.info("Successfully retrieved vehicle brands and models.")
+            return response.data
+        except Exception as e:
+            logging.error(f"Error loading vehicle brands and models: {e}")
+            return []
 
-#Carga un directorio con archivos a la base de datos
-def load_directory(directory):
-    #Carga los archivos desde un directorio 
-    loader=DirectoryLoader(directory,show_progress=True)
-    documents=loader.load()
-    documents=clean_data(documents)
-    logging.info("documentos cargados en langchain")
-    text_splitter=SemanticChunker(embeddings)
-    docs = text_splitter.split_documents(documents)
+    @classmethod
+    def load_vehicle_info_by_id(cls, vehicle_id: int) -> list[dict]:
+        """
+        Loads information for a specific vehicle by ID.
 
-    #Obtener la base de datos
-    vector_store = load_vector_store()
-    
-    #Crear el indice para evitar duplicados
-    print(index(docs,record_manager,vector_store,cleanup="incremental",source_id_key="source"))
+        Args:
+            vehicle_id (int): ID of the vehicle.
 
-    logging.info("Documentos insertados correctamente en la base de datos")
-    return vector_store
+        Returns:
+            list[dict]: Vehicle information.
+        """
+        table_name_vehicles = current_app.config["TABLE_NAME_VEHICLES"]
+        supabase = cls.get_client()
+        try:
+            response = supabase.table(table_name_vehicles).select('*').eq("id", vehicle_id).execute()
+            logging.info(f"Successfully retrieved vehicle information for ID {vehicle_id}.")
+            return response.data
+        except Exception as e:
+            logging.error(f"Error loading vehicle info by ID {vehicle_id}: {e}")
+            return []
 
-#Añade documento a la base de datos
-def load_file(file_path):
-    loader=UnstructuredFileLoader(file_path)
-    documents=loader.load()
-    documents=clean_data(documents)
+    @classmethod
+    def clean_data(cls, documents: list) -> list:
+        """
+        Cleans document data by removing unwanted characters.
 
-    logging.info("Documento cargado en langchain")
-    text_splitter = SemanticChunker(embeddings)
-    docs = text_splitter.split_documents(documents)
+        Args:
+            documents (list): List of documents to clean.
 
-    #Obtener la base de datos
-    vector_store = load_vector_store()
-    
-    #Crear el indice para evitar duplicados
-    print(index(docs,record_manager,vector_store,cleanup="incremental",source_id_key="source"))
-    logging.info("Documento insertado correctamente en la base de datos")
-    return vector_store
+        Returns:
+            list: Cleaned documents.
+        """
+        for document in documents:
+            document.page_content = document.page_content.replace("\u0000", "")
+        return documents
 
+    @classmethod
+    def process_documents(cls, loader, path_or_dir: str) -> list:
+        """
+        Generalized document processing for files or directories.
 
-#load_directory("docs/wagen/")
+        Args:
+            loader: Loader class for documents.
+            path_or_dir (str): Path to the file or directory.
 
-def load_vehicle_brands_models():
-    response = supabase.table(TABLE_NAME_VEHICLES).select('marca, modelo, id').execute()
-    logging.info("Información vehiculos extraida correctamente")
-    data=response.data
-    return data
+        Returns:
+            list: Processed and split documents.
+        """
+        documents = loader(path_or_dir).load()
+        documents = cls.clean_data(documents)
+        embeddings = OpenAIEmbeddings()
+        text_splitter = SemanticChunker(embeddings)
+        return text_splitter.split_documents(documents)
 
-def load_vehicle_info_by_id(id):
-    reponse=supabase.table(TABLE_NAME_VEHICLES).select('*').eq("id", id).execute()
-    logging.info("Información de vehiculo extraida correctamente")
-    data=reponse.data
-    return data
-    
+    @classmethod
+    def load_directory(cls, directory: str):
+        """
+        Loads all documents from a directory into the vector store.
+
+        Args:
+            directory (str): Directory path.
+
+        Returns:
+            SupabaseVectorStore: Updated vector store.
+        """
+        docs = cls.process_documents(DirectoryLoader, directory)
+        vector_store = cls.load_vector_store()
+        namespace = f"concesionarios/los-coches/{current_app.config['TABLE_NAME']}"
+        record_manager = SQLRecordManager(namespace, db_url="sqlite:///record_manager_cache.sql")
+        index(docs, record_manager, vector_store, cleanup="incremental", source_id_key="source")
+        logging.info("Documents successfully inserted into the database.")
+        return vector_store
+
+    @classmethod
+    def load_file(cls, file_path: str):
+        """
+        Loads a single document file into the vector store.
+
+        Args:
+            file_path (str): Path to the file.
+
+        Returns:
+            SupabaseVectorStore: Updated vector store.
+        """
+        docs = cls.process_documents(UnstructuredFileLoader, file_path)
+        vector_store = cls.load_vector_store()
+        namespace = f"concesionarios/los-coches/{current_app.config['TABLE_NAME']}"
+        record_manager = SQLRecordManager(namespace, db_url="sqlite:///record_manager_cache.sql")
+        index(docs, record_manager, vector_store, cleanup="incremental", source_id_key="source")
+        logging.info("Document successfully inserted into the database.")
+        return vector_store

@@ -11,9 +11,6 @@ from graphrag.query.indexer_adapters import (
     read_indexer_reports,
     read_indexer_text_units,
 )
-from graphrag.query.input.loaders.dfs import (
-    store_entity_semantic_embeddings,
-)
 from graphrag.query.llm.oai.chat_openai import ChatOpenAI
 from graphrag.query.llm.oai.embedding import OpenAIEmbedding
 from graphrag.query.llm.oai.typing import OpenaiApiType
@@ -24,8 +21,8 @@ from graphrag.query.structured_search.local_search.mixed_context import (
 from graphrag.query.structured_search.local_search.search import LocalSearch
 from graphrag.vector_stores.lancedb import LanceDBVectorStore
 
-INPUT_DIR = "./ragtest/output"
-#INPUT_DIR = "../../ragtest/output"
+INPUT_DIR = "./graphrag/output"
+#INPUT_DIR = "../../graphrag/output"
 LANCEDB_URI = f"{INPUT_DIR}/lancedb"
 
 COMMUNITY_REPORT_TABLE = "create_final_community_reports"
@@ -45,12 +42,10 @@ entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL
 # load description embeddings to an in-memory lancedb vectorstore
 # to connect to a remote db, specify url and port values.
 description_embedding_store = LanceDBVectorStore(
-    collection_name="entity_description_embeddings",
+    collection_name="default-entity-description",
 )
 description_embedding_store.connect(db_uri=LANCEDB_URI)
-entity_description_embeddings = store_entity_semantic_embeddings(
-    entities=entities, vectorstore=description_embedding_store
-)
+
 relationship_df = pd.read_parquet(f"{INPUT_DIR}/{RELATIONSHIP_TABLE}.parquet")
 relationships = read_indexer_relationships(relationship_df)
 report_df = pd.read_parquet(f"{INPUT_DIR}/{COMMUNITY_REPORT_TABLE}.parquet")
@@ -85,8 +80,6 @@ context_builder = LocalSearchMixedContext(
     text_units=text_units,
     entities=entities,
     relationships=relationships,
-    # if you did not run covariates during indexing, set this to None
-    #covariates=covariates,
     entity_text_embeddings=description_embedding_store,
     embedding_vectorstore_key=EntityVectorStoreKey.ID,  # if the vectorstore uses entity title as ids, set this to EntityVectorStoreKey.TITLE
     text_embedder=text_embedder,

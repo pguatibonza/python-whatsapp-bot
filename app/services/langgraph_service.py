@@ -1,8 +1,5 @@
 from datetime import datetime
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.tools.tavily_search import TavilySearchResults
-from dotenv import load_dotenv
-from supabase import create_client
 #from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.output_parsers import StrOutputParser
 from typing import Annotated, Callable
@@ -14,34 +11,28 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Literal
 from typing import List
 from typing_extensions import TypedDict
-from langchain.tools.retriever import create_retriever_tool
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from pprint import pprint
 from typing import Any,  Literal, Union
 from langchain_core.messages import  AnyMessage
 from langchain.schema import AIMessage
-from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.runnables import Runnable, RunnableConfig
 from typing import Annotated, Literal, Optional
 from langchain_core.messages import ToolMessage, HumanMessage, RemoveMessage,SystemMessage
 from langgraph.prebuilt import ToolNode
 import logging
 import os
-
-# import supabase_service
+from dotenv import load_dotenv
+load_dotenv()
 # import tools
-# from prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT , MULTIMEDIA_ASSISTANT_PROMPT
+# import prompts 
 # from graphrag_service import search_engine
 
-from . import supabase_service
 from . import tools
-from .prompts import PRIMARY_ASSISTANT_PROMPT,CONTEXTUAL_ASSISTANT_PROMPT,QUERY_IDENTIFIER_PROMPT, MULTIMEDIA_ASSISTANT_PROMPT
+from . import prompts 
 from .graphrag_service import search_engine
 
-load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -50,13 +41,10 @@ TABLE_NAME = os.getenv("TABLE_NAME")
 LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT")
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 LANGCHAIN_TRACING_V2=os.getenv("LANGCHAIN_TRACING_V2")
-
-
-
+TABLE_NAME_VEHICLES=os.getenv("TABLE_NAME_VEHICLES")
 
 chat = ChatOpenAI(model="gpt-4o", temperature=0)
 # Crear cliente de Supabase
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 embeddings = OpenAIEmbeddings()  # Inicializar embeddings
 #vector_store = supabase_service.load_vector_store()
 #retriever=vector_store.as_retriever(search_kwargs={"k":3})
@@ -66,12 +54,12 @@ memory=MemorySaver()
 
 #LLM with function call
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
-agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.toRagAssistant])
+agent= llm.bind_tools([tools.toAppointmentAssistant,tools.toRagAssistant])
 
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", PRIMARY_ASSISTANT_PROMPT),
+        ("system", prompts.PRIMARY_ASSISTANT_PROMPT),
         ("human", "{input}"),
         ("placeholder","{messages}"),
         
@@ -80,7 +68,21 @@ prompt = ChatPromptTemplate.from_messages(
 
 main_agent=prompt | agent
 
+###Appointment Assistant
 
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+agent= llm.bind_tools([tools.tool_create_event_test_drive,tools.tool_get_available_time_slots,tools.tool_is_time_slot_available,tools.CompleteOrEscalate])
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", prompts.APPOINTMENT_ASSISTANT_PROMPT),
+        ("human", "{input}"),
+        ("placeholder","{messages}"),
+        
+    ]
+).partial(time=datetime.now())
+
+appointment_agent=prompt | agent
 
 ### RAG ASSISTANT
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
@@ -88,7 +90,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", CONTEXTUAL_ASSISTANT_PROMPT),
+        ("system", prompts.CONTEXTUAL_ASSISTANT_PROMPT),
         ("human", "{user_input}"),
         ("placeholder", "{messages}")
     ]
@@ -99,6 +101,15 @@ rag_agent = prompt | llm
 
 # Post-processing
 def format_docs(docs):
+    """
+    Formats a list of documents into a single string.
+
+    Args:
+        docs (List[Document]): List of Document objects to format.
+
+    Returns:
+        str: Formatted string containing the content of all documents.
+    """
     return "\n\n".join(doc.page_content for doc in docs)
 
 
@@ -108,7 +119,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", QUERY_IDENTIFIER_PROMPT),
+        ("system", prompts.QUERY_IDENTIFIER_PROMPT),
         ("human", "{user_input}"),
         ("placeholder", "{messages}")
     ]
@@ -123,7 +134,7 @@ llm = ChatOpenAI(model="gpt-4o",temperature=0)
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", MULTIMEDIA_ASSISTANT_PROMPT),
+        ("system", prompts.MULTIMEDIA_ASSISTANT_PROMPT),
         ("human", "{user_input}"),
         ("placeholder", "{messages}")
     ]
@@ -134,7 +145,17 @@ multimedia_agent = prompt | llm.bind_tools([tools.tool_get_car_technical_info])
 ###Graph state
 
 def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
-    """Push or pop the state."""
+    """
+    Updates the dialog stack by either pushing or popping states.
+
+    Args:
+        left (list[str]): Current dialog stack.
+        right (Optional[str]): The new state to add or "pop" to remove the last state.
+
+    Returns:
+        list[str]: Updated dialog stack.
+    """
+
     if right is None:
         return left
     if right == "pop":
@@ -142,7 +163,16 @@ def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
     return left + [right]
 
 class GraphState(TypedDict):
+    """
+    Defines the structure for maintaining graph state during assistant execution.
 
+    Attributes:
+        user_input (str): Input provided by the user.
+        messages (list): List of messages exchanged during the dialog.
+        dialog_state (list[str]): Current dialog state stack.
+        summary (str): Summary of the conversation.
+        context (str): Additional context information.
+    """
 
     user_input:str
     messages : Annotated[list, add_messages]
@@ -155,6 +185,16 @@ class GraphState(TypedDict):
 ### Nodes
 
 def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
+    """
+    Creates an entry node for an assistant.
+
+    Args:
+        assistant_name (str): Name of the assistant.
+        new_dialog_state (str): State to transition to.
+
+    Returns:
+        Callable: Function to create an entry node.
+    """
     def entry_node(state: GraphState) -> dict:
         messages=[]
         for tool_call in state["messages"][-1].tool_calls:
@@ -173,14 +213,13 @@ def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
 
 async def primary_assistant(state):
     """
-    Invokes the agent model to generate a response based on the current state. Given
-    the input, it will decide to use any tool, retrieve info, or keep chatting.
+    Generates a response based on the current state using the primary assistant.
 
     Args:
-        state (messages): The current state
+        state (GraphState): Current state of the conversation.
 
     Returns:
-        dict: The updated state with the agent response appended to messages
+        dict: Updated state with appended response.
     """
     logging.debug("Entering primary_assistant node")
     user_input=state["user_input"]
@@ -190,38 +229,66 @@ async def primary_assistant(state):
     logging.debug(f"Response from primary_assistant: {response.content}")
     return {"messages": [response],"user_input":user_input}
 
+async def appointment_assistant(state):
+    """
+    Generates a response based on the current state using the .
+
+    Args:
+        state (GraphState): Current state of the conversation.
+
+    Returns:
+        dict: Updated state with appended response.
+    """
+    logging.debug("Entering appointment_assistant node")
+
+    user_input=state["user_input"]
+    response=await appointment_agent.ainvoke({"input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
+    
+    logging.debug(f"Response from appointment_assistant : {response.content}")
+    return {"messages":[response]}
 
 async def rag_router(state):
+    logging.debug("Entering  rag router")
+    
     user_input=state["user_input"]
-
     response=await context_router.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
+    response.content=""
+    logging.debug(f"Tool called : {response}")
     return {"messages" : [response]}
 
 
 async def graph_rag(state):
-    tool_call=state["messages"][-1].tool_calls[0]
-    tool_call_id=tool_call["id"]
-    query=tool_call["args"]["query"]
-    message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
-
-    response = await search_engine.asearch(query)
-
-    return {"context":response.response,"messages":[message]}
+    logging.debug("Entering graph rag node")
+    final_response=""
+    #TO-DO implementar en demas tools
+    for tool_call in state["messages"][-1].tool_calls:
+        if tool_call["name"]==tools.QueryIdentifier.__name__:
+            tool_call_id=tool_call["id"]
+            query=tool_call["args"]["query"]
+            message=ToolMessage(content="Now accessing to the graph rag database." ,tool_call_id=tool_call_id)
+            response = await search_engine.asearch(query)
+            final_response+=response.response
+    
+    logging.debug(f"Response from graph rag : {final_response}")
+    return {"context":final_response,"messages":[message]}
 
 async def rag_assistant(state):
-
+    logging.debug("Entering rag answering node")
+    
     user_input=state["user_input"]
-
     context=state.get("context","")
-
     response=await  rag_agent.ainvoke({"user_input":user_input,"messages":state["messages"],"context":context ,"summary":state.get("summary","")})
     
+    logging.debug(f"Response from rag assistant : {response.content}")
     return {"messages": [response]}
 
 async def multimedia_assistant(state):
+    logging.debug("Entering multimedia assistant node")
+    
     user_input=state["user_input"]
     response = await multimedia_agent.ainvoke({"user_input":user_input,"messages":state["messages"],"summary":state.get("summary","")})
-
+    
+    logging.debug(f"Response from multimedia assistant : {response.content}")
     return {"messages":[response]}
 
 async def summarize_conversation(state: GraphState):
@@ -289,7 +356,7 @@ def route_primary_assistant(
     state: GraphState,
 ) -> Literal[
     "enter_rag_assistant",
-    "tools",
+    "enter_appointment_assistant",
     "summarize_conversation",
     "__end__",
 ]:
@@ -301,15 +368,18 @@ def route_primary_assistant(
     if tool_calls:
         if tool_calls[0]["name"] == tools.toRagAssistant.__name__:
             return "enter_rag_assistant"
+        elif tool_calls[0]["name"]==tools.toAppointmentAssistant.__name__:
+            return "enter_appointment_assistant"
         else:
-            return "tools"
+            raise ValueError("Invalid tool call")
     raise ValueError("Invalid route")
 
 def route_to_workflow(
     state: GraphState,
 ) -> Literal[
     "primary_assistant",
-    "router_rag_assistant"
+    "router_rag_assistant",
+    "appointment_assistant"
 ]:
     """If we are in a delegated state, route directly to the appropriate assistant."""
     dialog_state = state.get("dialog_state")
@@ -350,6 +420,14 @@ def route_multimedia_assistant(state):
         return "tools_multimedia"
     return should_summarize(state)
 
+def route_appointment_assistant(state):
+    tool_calls=state["messages"][-1].tool_calls
+    if tool_calls:
+        if tool_calls[0]["name"]==tools.CompleteOrEscalate.__name__:
+            return "leave_skill"
+        return "tools_appointment"
+    return should_summarize(state)
+
 # This node will be shared for exiting all specialized assistants
 def pop_dialog_state(state: GraphState) -> dict:
     """Pop the dialog stack and return to the main assistant.
@@ -378,21 +456,32 @@ workflow = StateGraph(GraphState)
 
 # Define the nodes
 
-
+#Entry
 workflow.add_conditional_edges(START,route_to_workflow)
 
+#Primary assistant
 workflow.add_node("primary_assistant",primary_assistant)
+workflow.add_conditional_edges("primary_assistant",route_primary_assistant)
 
+#Appointment assistant
+workflow.add_node("enter_appointment_assistant",create_entry_node("Appointment assistant","appointment_assistant"))
+workflow.add_node("appointment_assistant",appointment_assistant)
+workflow.add_conditional_edges("appointment_assistant",route_appointment_assistant)
+
+workflow.add_edge("enter_appointment_assistant","appointment_assistant")
+workflow.add_node("tools_appointment",ToolNode([tools.tool_create_event_test_drive,tools.tool_is_time_slot_available,tools.tool_get_available_time_slots,tools.CompleteOrEscalate]))
+workflow.add_edge("tools_appointment","appointment_assistant")
+
+#Router rag
 workflow.add_node("router_rag_assistant",rag_router)
-workflow.add_conditional_edges(
-    "router_rag_assistant", 
-    route_rag_assistant,
-    )
+workflow.add_conditional_edges("router_rag_assistant", route_rag_assistant)
 
+#Rag assistant
 workflow.add_node("enter_rag_assistant", create_entry_node("RAG assistant", "router_rag_assistant"))  
 workflow.add_node("rag_assistant", rag_assistant)
 workflow.add_edge("enter_rag_assistant","router_rag_assistant")
 
+#Multimedia assistant
 workflow.add_node("enter_multimedia_assistant",create_entry_node("Multimedia Assistant","router_rag_assistant"))
 workflow.add_edge("enter_multimedia_assistant","multimedia_assistant")
 
@@ -402,15 +491,12 @@ workflow.add_edge("tools_multimedia","multimedia_assistant")
 workflow.add_conditional_edges("multimedia_assistant", route_multimedia_assistant)
 
 
-workflow.add_node("tools",ToolNode([tools.tool_create_event_test_drive]))
-workflow.add_edge("tools","primary_assistant")
-
-
-workflow.add_conditional_edges("primary_assistant",route_primary_assistant)
+#Graph rag
 workflow.add_node("graph_rag",graph_rag)
 workflow.add_edge("graph_rag","rag_assistant")
 
 workflow.add_conditional_edges("rag_assistant", route_assistants)
+#Utilities
 workflow.add_node("leave_skill",pop_dialog_state)
 workflow.add_edge("leave_skill", "primary_assistant")
 

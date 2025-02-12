@@ -5,7 +5,7 @@ Given a text document that is potentially relevant to this activity and a list o
 -Steps-
 1. Identify all entities. For each identified entity, extract the following information:
 - entity_name: Name of the entity, capitalized
-- entity_type: One of the following types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+- entity_type: One of the following types: [vehicle_model, price, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
 - entity_description: Comprehensive description of the entity's attributes and activities
 Format each entity as ("entity"{tuple_delimiter}<entity_name>{tuple_delimiter}<entity_type>{tuple_delimiter}<entity_description>)
 
@@ -28,7 +28,7 @@ Format each relationship as ("relationship"{tuple_delimiter}<source_entity>{tupl
 
 Example 1:
 
-entity_types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+entity_types: [vehicle_model,price, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
 text:
 Audi Q8 55 TFSI quattro MHEV Progressive - Ficha Técnica Completa - Modelo 2024
 
@@ -328,7 +328,7 @@ output:
 
 -Real Data-
 ######################
-entity_types: [vehicle_model, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
+entity_types: [vehicle_model, price, engine, transmission, performance, dimensions, suspension, brakes, safety_features, comfort_features, driver_assistance_technology, entertainment_system, exterior_design, interior_design, warranty, maintenance_services, insurance, colors_available]
 text: {input_text}
 ######################
 output:
