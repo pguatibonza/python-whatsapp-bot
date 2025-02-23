@@ -92,6 +92,23 @@ class SupabaseService:
         except Exception as e:
             logging.error(f"Error loading vehicle info by ID {vehicle_id}: {e}")
             return []
+    @classmethod
+    def load_dealership_info(cls) -> list[dict]:
+        """
+        Loads dealership information from the database.
+
+        Returns:
+            list[dict]: List of dealerships with columns id, nombre, and description.
+        """
+        table_name_concesionarios = current_app.config["TABLE_NAME_DEALERSHIP"]
+        supabase = cls.get_client()
+        try:
+            response = supabase.table(table_name_concesionarios).select('*').execute()
+            logging.info("Successfully retrieved dealership information.")
+            return response.data
+        except Exception as e:
+            logging.error(f"Error loading dealership information: {e}")
+            return []
 
     @classmethod
     def clean_data(cls, documents: list) -> list:

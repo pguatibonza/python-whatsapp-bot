@@ -220,7 +220,7 @@ class CompleteOrEscalate(BaseModel):
 
 class toRagAssistant(BaseModel):
     """
-    Transfers work to a specialized assistant  to handle any conceptual doubts/inquiries about the vehicles available. 
+    Transfers work to a specialized assistant  to handle any conceptual doubts/inquiries about the vehicles available and the general information of the car dealership. 
     This includes specifications, features, pricing, availability, and any current promotions or financing options.
     Only give information about vehicles Los Coches have, never give information about another brand they don't sell.
     If general information about car concepts are asked, answer.
@@ -245,6 +245,15 @@ class QueryIdentifier(BaseModel):
 class MultimediaIdentifier(BaseModel):
     """ Identify if the model needs to extract any multimedia(technical cards, videos, images) given the user request"""
     query : str = Field(description='query that is going to enter into the multimedia assistant')
+class DealershipInfoIdentifier(BaseModel):
+    """
+    Identifies if retrieval of general dealership information is needed.
+    When creating the query, maintain context from previous interactions and combine it with the new request parameters related to dealership data.
+    Example: "Financing options, promotions, and services available at Los Coches."
+    """
+    query: str = Field(
+        description="Precise search string combining current request with dealership-specific information from conversation history. For example, 'What financing options do you offer at Los Coches?' or 'Current promotions and offers at Los Coches.'"
+    )
 class CarModel(BaseModel):
     id : int = Field (description = "Car id ")
 
@@ -281,5 +290,47 @@ tool_get_car_technical_info=StructuredTool.from_function(
     name = "get_car_info", 
     description="Obtiene la ficha tecnica y fotos/videos de un carro",
     handle_tool_error=True)
+
+def get_dealership_description(query: str) -> str:
+    """
+    Given a user query and the list of dealerships loaded from the database,
+    returns the 'description' field of the dealership that best answers the query.
     
+    Args:
+        query (str): The user's query regarding dealership details (e.g., financing options, offers, services).
+        
+    Returns:
+        str: The description of the selected dealership.
+    """
+    # Load dealership information from the database
+    dealerships = SupabaseService.load_dealership_info()
+
+    # Define a structured output model for the description
+    class DealershipDescription(BaseModel):
+        description: str = Field(..., description="Description of the dealership that answers the query")
+    
+    # Setup the LLM with structured output using a smaller model
+    chat = ChatOpenAI(model="gpt-4o-mini", temperature=0).with_structured_output(DealershipDescription)
+    
+    # Define the system prompt
+    SYSTEM = """
+    Given a list of dealership information (each entry contains 'id', 'nombre', and 'description')
+    and a user query regarding dealership details (such as financing options, offers, or services),
+    select the dealership that best matches the query and return only the 'description' field that answers the query.
+    ###
+    Dealership info: {dealership_info}
+    ###
+    User query: {query}
+    """
+    
+    # Create the prompt template
+    prompt = ChatPromptTemplate.from_messages([("system", SYSTEM)])
+    llm = prompt | chat
+    
+    # Invoke the LLM with the dealership info and the query
+    result = llm.invoke({"dealership_info": dealerships, "query": query})
+
+    
+    return result.description
+
 

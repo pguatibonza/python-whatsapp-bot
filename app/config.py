@@ -23,6 +23,7 @@ def load_configurations(app):
     app.config["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
     app.config["LANGCHAIN_TRACING_V2"]=os.getenv("LANGCHAIN_TRACING_V2")
     app.config["TABLE_NAME_VEHICLES"]=os.getenv("TABLE_NAME_VEHICLES")
+    app.config["TABLE_NAME_DEALERSHIP"]=os.getenv("TABLE_NAME_DEALERSHIP")
 
 
 def configure_logging():

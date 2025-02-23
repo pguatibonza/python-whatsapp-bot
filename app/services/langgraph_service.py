@@ -126,7 +126,7 @@ prompt = ChatPromptTemplate.from_messages(
 )
 
 
-context_router = prompt | llm.bind_tools([tools.CompleteOrEscalate,tools.QueryIdentifier,tools.MultimediaIdentifier])
+context_router = prompt | llm.bind_tools([tools.CompleteOrEscalate,tools.QueryIdentifier,tools.MultimediaIdentifier,tools.DealershipInfoIdentifier])
 
 ### Get multimedia info
 
@@ -272,6 +272,19 @@ async def graph_rag(state):
     logging.debug(f"Response from graph rag : {final_response}")
     return {"context":final_response,"messages":[message]}
 
+async def db_context(state):
+    logging.debug("Entering db context node")
+    final_response=""
+    for tool_call in state["messages"][-1].tool_calls:
+        if tool_call["name"]==tools.DealershipInfoIdentifier.__name__:
+            tool_call_id=tool_call["id"]
+            query=tool_call["args"]["query"]
+            message=ToolMessage(content="Now accessing to the context database." ,tool_call_id=tool_call_id)
+            response = tools.get_dealership_description(query)
+            final_response+=response
+    logging.debug(f"Response from graph rag : {final_response}")
+    return {"context": final_response, "messages":[message]}
+
 async def rag_assistant(state):
     logging.debug("Entering rag answering node")
     
@@ -403,13 +416,15 @@ def route_assistants(
     # if did_cancel:
     #     return "leave_skill"
     
-def route_rag_assistant(state:GraphState) -> Literal["leave_skill","graph_rag","rag_assistant","enter_multimedia_assistant"]:
+def route_rag_assistant(state:GraphState) -> Literal["leave_skill","graph_rag","rag_assistant","enter_multimedia_assistant","db_context"]:
     tool_calls = state["messages"][-1].tool_calls
     if tool_calls:
         if tool_calls[0]["name"] == tools.CompleteOrEscalate.__name__:
             return "leave_skill"
         elif tool_calls[0]["name"] == tools.QueryIdentifier.__name__:
             return "graph_rag"
+        elif tool_calls[0]["name"]==tools.DealershipInfoIdentifier.__name__:
+            return "db_context"
         elif tool_calls[0]["name"] ==tools.MultimediaIdentifier.__name__:
             return "enter_multimedia_assistant"
     return "rag_assistant"
@@ -494,6 +509,10 @@ workflow.add_conditional_edges("multimedia_assistant", route_multimedia_assistan
 #Graph rag
 workflow.add_node("graph_rag",graph_rag)
 workflow.add_edge("graph_rag","rag_assistant")
+
+#DB context
+workflow.add_node("db_context",db_context)
+workflow.add_edge("db_context","rag_assistant")
 
 workflow.add_conditional_edges("rag_assistant", route_assistants)
 #Utilities
