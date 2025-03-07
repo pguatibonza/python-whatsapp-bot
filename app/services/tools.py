@@ -241,7 +241,7 @@ class QueryIdentifier(BaseModel):
     - Maintain context from previous interactions
     - Combine previous context with new request parameters"""
     
-    query: str = Field(description="Precise search string combining current request with specific entities from conversation history. Example: 'Price of ModelX, ModelY' when following up on previous model list")
+    query: str = Field(description="Precise search string combining current request with necessary context from conversation history. Example: 'Price of ModelX, ModelY' when following up on previous model list")
 class MultimediaIdentifier(BaseModel):
     """ Identify if the model needs to extract any multimedia(technical cards, videos, images) given the user request"""
     query : str = Field(description='query that is going to enter into the multimedia assistant')
