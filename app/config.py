@@ -2,6 +2,8 @@ import sys
 import os
 from dotenv import load_dotenv
 import logging
+import logging.config
+
 
 
 def load_configurations(app):
@@ -27,8 +29,41 @@ def load_configurations(app):
 
 
 def configure_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-    )
+
+    LOGGING_CONFIG = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "standard": {
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "standard",
+                "level": "DEBUG",
+                "stream": "ext://sys.stdout",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+        "loggers": {
+            "httpx": {
+                "level": "WARNING",  # Only log warnings or higher from httpx
+                "propagate": True,
+            },
+            "httpcore": {
+                "level": "WARNING",  # Only log warnings or higher from httpcore
+                "propagate": True,
+            },
+            "openai._base_client": {
+                "level": "WARNING",  # Silence debug messages from OpenAI's base client
+                "propagate": True,
+            },
+            # You can add additional loggers here if needed.
+        },
+    }
+    logging.config.dictConfig(LOGGING_CONFIG)

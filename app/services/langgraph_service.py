@@ -47,6 +47,9 @@ load_dotenv()
 from . import tools, prompts, agents
 from .graphrag_service import search_engine
 
+#logger = logging.getLogger(__name__)
+
+
 # Load environment configuration
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -148,193 +151,227 @@ def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
 # -------------------------
 async def primary_assistant(state: GraphState) -> dict:
     """
-    Processes user input using the PrimaryAgent, which handles general queries.
+    Processes user input using the PrimaryAgent (general queries) with robust error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state containing the agent's response.
+        dict: Updated state containing the agent's response or a fallback error message.
     """
     logging.debug("Entering primary_assistant node")
     user_input = state["user_input"]
-    response = await main_agent.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "summary": state.get("summary", "")
-    })
+    try:
+        response = await main_agent.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "summary": state.get("summary", "")
+        })
+    except Exception as e:
+        logging.error("Error in primary_assistant: %s", e)
+        response = SystemMessage(content="Lo siento, ocurrió un error al procesar tu consulta general. Por favor, inténtalo de nuevo.")
     logging.debug(f"Response from primary_assistant: {response.content}")
     return {"messages": [response], "user_input": user_input}
 
 async def appointment_assistant(state: GraphState) -> dict:
     """
-    Uses the AppointmentAgent to schedule test drive appointments.
+    Schedules test drive appointments using the AppointmentAgent with robust error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state with the appointment agent's response.
+        dict: Updated state with the appointment agent's response or fallback error message.
     """
     logging.debug("Entering appointment_assistant node")
     user_input = state["user_input"]
-    response = await appointment_agent.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "summary": state.get("summary", "")
-    })
+    try:
+        response = await appointment_agent.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "summary": state.get("summary", "")
+        })
+    except Exception as e:
+        logging.error("Error in appointment_assistant: %s", e)
+        response = SystemMessage(content="Lo siento, no se pudo procesar la solicitud de cita. Por favor, inténtalo nuevamente.")
     logging.debug(f"Response from appointment_assistant: {response.content}")
     return {"messages": [response]}
 
 async def rag_router(state: GraphState) -> dict:
     """
-    Invokes the ContextRouterAgent to determine which specialized agent should handle the query.
+    Determines the appropriate routing for technical queries using the ContextRouterAgent with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state containing the router's response.
+        dict: Updated state with the router's response or fallback error message.
     """
     logging.debug("Entering rag router node")
     user_input = state["user_input"]
-    response = await context_router.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "summary": state.get("summary", "")
-    })
-    # Clear content to signal that the router is not returning a direct answer.
-    response.content = ""
-    logging.debug(f"Tool called in router: {response}")
+    try:
+        response = await context_router.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "summary": state.get("summary", "")
+        })
+        # Clear content to indicate that the router does not provide a final answer.
+        response.content = ""
+    except Exception as e:
+        logging.error("Error in rag_router: %s", e)
+        response = SystemMessage(content="Lo siento, ocurrió un error al determinar la ruta. Por favor, inténtalo de nuevo.")
+    logging.debug(f"Router response: {response}")
     return {"messages": [response]}
 
 async def graph_rag(state: GraphState) -> dict:
     """
-    Processes tool calls for querying the dealership's technical data via the RAG agent.
-    
-    Iterates over tool calls in the last message, invokes a search engine call if needed,
-    and accumulates responses.
+    Aggregates technical data responses using tool calls in the RAG flow with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Contains the aggregated context and tool responses.
+        dict: Contains aggregated context and tool response messages, or fallback message on error.
     """
     logging.debug("Entering graph rag node")
     final_response = ""
     messages = []
-    for tool_call in state["messages"][-1].tool_calls:
-        tool_call_id = tool_call["id"]
-        if tool_call["name"] == tools.QueryIdentifier.__name__:
-            query = tool_call["args"]["query"]
-            response = await search_engine.asearch(query)
-            message = ToolMessage(content=f"{response.response}", tool_call_id=tool_call_id)
-            final_response += response.response
-        else:
-            message = ToolMessage(content="not valid tool call", tool_call_id=tool_call_id)
-        messages.append(message)
+    try:
+        for tool_call in state["messages"][-1].tool_calls:
+            tool_call_id = tool_call["id"]
+            if tool_call["name"] == tools.QueryIdentifier.__name__:
+                query = tool_call["args"]["query"]
+                response = await search_engine.asearch(query)
+                message = ToolMessage(content=f"{response.response}", tool_call_id=tool_call_id)
+                final_response += response.response
+            else:
+                message = ToolMessage(content="Not valid tool call", tool_call_id=tool_call_id)
+            messages.append(message)
+    except Exception as e:
+        logging.error("Error in graph_rag: %s", e)
+        final_response = "Lo siento, ocurrió un error al obtener la información técnica."
+        messages = [SystemMessage(content=final_response)]
     logging.debug(f"Response from graph rag: {final_response}")
     return {"context": final_response, "messages": messages}
 
 async def db_context(state: GraphState) -> dict:
     """
-    Handles queries regarding general dealership information by invoking a database lookup.
+    Retrieves general dealership information via a database lookup with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state with the dealership context and tool messages.
+        dict: Updated state with dealership context and corresponding messages, or fallback error message.
     """
     logging.debug("Entering db context node")
     final_response = ""
     messages = []
-    for tool_call in state["messages"][-1].tool_calls:
-        tool_call_id = tool_call["id"]
-        if tool_call["name"] == tools.DealershipInfoIdentifier.__name__:
-            query = tool_call["args"]["query"]
-            response = tools.get_dealership_description(query)
-            message = ToolMessage(content=f"{response}", tool_call_id=tool_call_id)
-            final_response += response
-        else:
-            message = ToolMessage(content="Not valid tool call", tool_call_id=tool_call_id)
-        messages.append(message)
-    logging.debug(f"Response from context db: {final_response}")
+    try:
+        for tool_call in state["messages"][-1].tool_calls:
+            tool_call_id = tool_call["id"]
+            if tool_call["name"] == tools.DealershipInfoIdentifier.__name__:
+                query = tool_call["args"]["query"]
+                response = tools.get_dealership_description(query)
+                message = ToolMessage(content=f"{response}", tool_call_id=tool_call_id)
+                final_response += response
+            else:
+                message = ToolMessage(content="Not valid tool call", tool_call_id=tool_call_id)
+            messages.append(message)
+    except Exception as e:
+        logging.error("Error in db_context: %s", e)
+        final_response = "Lo siento, no se pudo recuperar la información de concesionarios."
+        messages = [SystemMessage(content=final_response)]
+    logging.debug(f"Response from db context: {final_response}")
     return {"context": final_response, "messages": messages}
 
 async def rag_assistant(state: GraphState) -> dict:
     """
-    Uses the RagAgent to generate a detailed answer based on the user's query and aggregated context.
+    Generates a detailed technical response using the RagAgent with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state containing the RAG agent's response.
+        dict: Updated state containing the RAG agent's response or a fallback message.
     """
     logging.debug("Entering rag assistant node")
     user_input = state["user_input"]
     context = state.get("context", "")
-    response = await rag_agent.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "context": context,
-        "summary": state.get("summary", "")
-    })
+    try:
+        response = await rag_agent.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "context": context,
+            "summary": state.get("summary", "")
+        })
+    except Exception as e:
+        logging.error("Error in rag_assistant: %s", e)
+        response = SystemMessage(content="Lo siento, hubo un problema al procesar tu consulta técnica. Por favor, inténtalo de nuevo.")
     logging.debug(f"Response from rag assistant: {response.content}")
     return {"messages": [response]}
 
 async def multimedia_assistant(state: GraphState) -> dict:
     """
-    Uses the MultimediaAgent to fetch multimedia content or technical details for a vehicle.
+    Fetches multimedia content or technical details using the MultimediaAgent with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state containing the multimedia agent's response.
+        dict: Updated state with the multimedia agent's response or fallback message.
     """
     logging.debug("Entering multimedia assistant node")
     user_input = state["user_input"]
-    response = await multimedia_agent.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "summary": state.get("summary", "")
-    })
+    try:
+        response = await multimedia_agent.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "summary": state.get("summary", "")
+        })
+    except Exception as e:
+        logging.error("Error in multimedia_assistant: %s", e)
+        response = SystemMessage(content="Lo siento, no se pudo obtener el contenido multimedia. Inténtalo nuevamente.")
     logging.debug(f"Response from multimedia assistant: {response.content}")
     return {"messages": [response]}
 
 async def response_assistant(state: GraphState) -> dict:
     """
-    Uses the FinalResponseAgent to synthesize all gathered information and produce the final answer.
+    Synthesizes a final answer using the FinalResponseAgent with robust error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Updated state with the final consolidated response.
+        dict: Updated state with the final consolidated response or fallback error message.
     """
     logging.debug("Entering final response node")
     user_input = state["user_input"]
-    last_response = state["messages"][-1].content  # Use the latest message as context
-    response = await response_agent.ainvoke({
-        "user_input": user_input,
-        "messages": state["messages"],
-        "summary": state.get("summary", ""),
-        "last_response": last_response
-    })
+    try:
+        last_response = state["messages"][-1].content  # Latest message as context
+        response = await response_agent.ainvoke({
+            "user_input": user_input,
+            "messages": state["messages"],
+            "summary": state.get("summary", ""),
+            "last_response": last_response
+        })
+    except Exception as e:
+        logging.error("Error in response_assistant: %s", e)
+        response = SystemMessage(content="Lo siento, ocurrió un error al generar la respuesta final. Por favor, inténtalo de nuevo.")
+    logging.debug(f"Response from Response assistant: {response.content}")
+    
     return {"messages": [response]}
 
 async def summarize_conversation(state: GraphState) -> dict:
     """
-    Summarizes the conversation history to reduce context length and update the conversation summary.
+    Summarizes the conversation history to reduce context length and update the conversation summary,
+    with error handling.
     
     Args:
         state (GraphState): The current conversation state.
-        
+    
     Returns:
-        dict: Contains the updated summary and a list of messages to be removed.
+        dict: Contains the updated summary and a list of messages to be removed, or fallback summary.
     """
     summary = state.get("summary", "")
     if summary:
@@ -345,16 +382,18 @@ async def summarize_conversation(state: GraphState) -> dict:
     else:
         summary_message = "Create a summary of the conversation above:"
     
-    # Append a HumanMessage with the summary prompt to the conversation history.
     messages = state["messages"] + [HumanMessage(content=summary_message)]
-    response = await llm.ainvoke(messages)
-
-    # Identify the final messages to keep (e.g., the last two messages and any relevant tool calls).
+    try:
+        response = await llm.ainvoke(messages)
+    except Exception as e:
+        logging.error("Error in summarize_conversation: %s", e)
+        response = SystemMessage(content=summary or "No summary available.")
+    
+    # Determine final messages to keep.
     last_two_messages = state["messages"][-2:]
     final_messages = []
     for message in last_two_messages:
         final_messages.append(message)
-        # If the message is a ToolMessage, include its associated AI response.
         if isinstance(message, ToolMessage):
             tool_index = state["messages"].index(message)
             if tool_index - 1 < len(state["messages"]):
@@ -363,9 +402,9 @@ async def summarize_conversation(state: GraphState) -> dict:
                     final_messages.append(state["messages"][tool_index - i])
                     i += 1
                 final_messages.append(state["messages"][tool_index - i])
-    # Mark messages for deletion that are not in the final set.
     delete_messages = [RemoveMessage(id=m.id) for m in state["messages"] if m not in final_messages]
     return {"summary": response.content, "messages": delete_messages}
+
 
 # -------------------------
 # Routing Functions (Edges)
@@ -586,10 +625,8 @@ async def generate_response(message_body, wa_id):
     messages_output = []
     async for output in app.astream(inputs, config=config):
         for key, value in output.items():
-            pprint(f"Node '{key}':")
             if key == 'final_response' and 'messages' in value:
                 output_message = value["messages"][-1]
                 if isinstance(output_message, AIMessage) and output_message.content != '':
                     messages_output.append(output_message.content)
-        pprint("\n---\n")
     return messages_output
