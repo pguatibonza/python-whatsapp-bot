@@ -58,7 +58,7 @@ def webhook_get():
 @signature_required
 async def webhook_post():
     body = await request.get_json()
-    logging.info(f"Received webhook: {json.dumps(body)}")
+    #logging.info(f"Received webhook: {json.dumps(body)}")
     
     # Offload processing to a background task
     asyncio.create_task(handle_message(body))
