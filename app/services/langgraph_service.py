@@ -16,10 +16,8 @@ The module also defines functions for:
 
 External dependencies include LangChain, LangGraph, and environment configuration.
 """
-
 from datetime import datetime
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-#from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.output_parsers import StrOutputParser
 from typing import Annotated, Callable
 from typing_extensions import TypedDict
@@ -36,18 +34,25 @@ from langchain_core.messages import AnyMessage
 from langchain.schema import AIMessage
 from langchain_core.messages import ToolMessage, HumanMessage, RemoveMessage, SystemMessage
 from langgraph.prebuilt import ToolNode
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 import logging
 import os
 from dotenv import load_dotenv
+import asyncio
+from asyncio import WindowsSelectorEventLoopPolicy
+import sys
 
 # Load environment variables
 load_dotenv()
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 # Import our custom modules
 from . import tools, prompts, agents
 from .graphrag_service import search_engine
 
-#logger = logging.getLogger(__name__)
 
 
 # Load environment configuration
@@ -60,14 +65,11 @@ LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT")
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2")
 TABLE_NAME_VEHICLES = os.getenv("TABLE_NAME_VEHICLES")
+DB_URI = os.getenv("DB_URI")
 
 # Initialize LLM and Embeddings (if needed)
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 embeddings = OpenAIEmbeddings()  # For potential future use (e.g., vector searches)
-
-# Initialize memory checkpointer for the state graph
-# (Here using in-memory storage; consider switching to a persistent database for production)
-memory = MemorySaver()
 
 # -------------------------
 # Instantiate Specialized Agents
@@ -79,6 +81,7 @@ rag_agent = agents.RagAgent()
 response_agent = agents.FinalResponseAgent()
 context_router = agents.ContextRouterAgent()
 multimedia_agent = agents.MultimediaAgent()
+
 
 # -------------------------
 # Graph State and Utility Functions
@@ -241,7 +244,7 @@ async def graph_rag(state: GraphState) -> dict:
             tool_call_id = tool_call["id"]
             if tool_call["name"] == tools.QueryIdentifier.__name__:
                 query = tool_call["args"]["query"]
-                response = await search_engine.asearch(query)
+                response = await search_engine.search(query)
                 message = ToolMessage(content=f"{response.response}", tool_call_id=tool_call_id)
                 final_response += response.response
             else:
@@ -599,8 +602,32 @@ workflow.add_edge("leave_skill", "primary_assistant")
 workflow.add_node("summarize_conversation", summarize_conversation)
 workflow.add_edge("summarize_conversation", END)
 
+# Initialize memory checkpointer for the state graph
+# (Here using in-memory storage; consider switching to a persistent database for production)
+# Optional: tune these for your workload
+connection_kwargs = {
+    "autocommit": True,
+    "prepare_threshold": 0,
+}
+async def _init_graph():
+
+    # 1. create async pool
+    pool = AsyncConnectionPool(
+        conninfo=DB_URI,
+        max_size=20,
+        kwargs=connection_kwargs,
+    )
+
+    await pool.open()
+    # 2. make async saver and ensure table exists
+    saver = AsyncPostgresSaver(pool)
+    await saver.setup()
+    # 3. compile once with this saver
+    return workflow.compile(checkpointer=saver)
+    # at module import, block until Graph is ready
+   
 # Compile the state graph with memory checkpointer.
-app = workflow.compile(checkpointer=memory)
+app = asyncio.get_event_loop().run_until_complete(_init_graph())
 config = {"configurable": {"thread_id": "6"}}
 
 # -------------------------

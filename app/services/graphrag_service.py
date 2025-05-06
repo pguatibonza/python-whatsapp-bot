@@ -1,43 +1,36 @@
 import os
-
 import pandas as pd
 import tiktoken
-
 from graphrag.query.context_builder.entity_extraction import EntityVectorStoreKey
-from graphrag.query.indexer_adapters import (
-    read_indexer_covariates,
-    read_indexer_entities,
-    read_indexer_relationships,
-    read_indexer_reports,
-    read_indexer_text_units,
-)
-from graphrag.query.llm.oai.chat_openai import ChatOpenAI
-from graphrag.query.llm.oai.embedding import OpenAIEmbedding
-from graphrag.query.llm.oai.typing import OpenaiApiType
+from graphrag.query.indexer_adapters import (read_indexer_covariates,read_indexer_entities,read_indexer_relationships,read_indexer_reports,read_indexer_text_units)
+
 from graphrag.query.question_gen.local_gen import LocalQuestionGen
 from graphrag.query.structured_search.local_search.mixed_context import (
     LocalSearchMixedContext,
 )
 from graphrag.query.structured_search.local_search.search import LocalSearch
 from graphrag.vector_stores.lancedb import LanceDBVectorStore
+from graphrag.config.enums import ModelType
+from graphrag.config.models.language_model_config import LanguageModelConfig
+from graphrag.language_model.manager import ModelManager
 
 INPUT_DIR = "./graphrag_reduced/output"
 #INPUT_DIR = "../../graphrag/output"
 LANCEDB_URI = f"{INPUT_DIR}/lancedb"
 
-COMMUNITY_REPORT_TABLE = "create_final_community_reports"
-ENTITY_TABLE = "create_final_nodes"
-ENTITY_EMBEDDING_TABLE = "create_final_entities"
-RELATIONSHIP_TABLE = "create_final_relationships"
-COVARIATE_TABLE = "create_final_covariates"
-TEXT_UNIT_TABLE = "create_final_text_units"
+COMMUNITY_REPORT_TABLE = "community_reports"
+ENTITY_TABLE = "entities"
+COMMUNITY_TABLE = "communities"
+RELATIONSHIP_TABLE = "relationships"
+COVARIATE_TABLE = "covariates"
+TEXT_UNIT_TABLE = "text_units"
 COMMUNITY_LEVEL = 2
 
 # read nodes table to get community and degree data
 entity_df = pd.read_parquet(f"{INPUT_DIR}/{ENTITY_TABLE}.parquet")
-entity_embedding_df = pd.read_parquet(f"{INPUT_DIR}/{ENTITY_EMBEDDING_TABLE}.parquet")
+community_df = pd.read_parquet(f"{INPUT_DIR}/{COMMUNITY_TABLE}.parquet")
 
-entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL)
+entities = read_indexer_entities(entity_df, community_df, COMMUNITY_LEVEL)
 
 # load description embeddings to an in-memory lancedb vectorstore
 # to connect to a remote db, specify url and port values.
@@ -49,7 +42,8 @@ description_embedding_store.connect(db_uri=LANCEDB_URI)
 relationship_df = pd.read_parquet(f"{INPUT_DIR}/{RELATIONSHIP_TABLE}.parquet")
 relationships = read_indexer_relationships(relationship_df)
 report_df = pd.read_parquet(f"{INPUT_DIR}/{COMMUNITY_REPORT_TABLE}.parquet")
-reports = read_indexer_reports(report_df, entity_df, COMMUNITY_LEVEL)
+reports = read_indexer_reports(report_df, community_df, COMMUNITY_LEVEL)
+
 text_unit_df = pd.read_parquet(f"{INPUT_DIR}/{TEXT_UNIT_TABLE}.parquet")
 text_units = read_indexer_text_units(text_unit_df)
 
@@ -57,22 +51,31 @@ api_key = os.environ["GRAPHRAG_API_KEY"]
 llm_model = os.environ["GRAPHRAG_LLM_MODEL"]
 embedding_model = os.environ["GRAPHRAG_EMBEDDING_MODEL"]
 
-llm = ChatOpenAI(
+chat_config = LanguageModelConfig(
     api_key=api_key,
+    type=ModelType.OpenAIChat,
     model=llm_model,
-    api_type=OpenaiApiType.OpenAI,  # OpenaiApiType.OpenAI or OpenaiApiType.AzureOpenAI
+    max_retries=20,
+)
+chat_model = ModelManager().get_or_create_chat_model(
+    name="local_search",
+    model_type=ModelType.OpenAIChat,
+    config=chat_config,
+)
+
+token_encoder = tiktoken.encoding_for_model(llm_model)
+
+embedding_config = LanguageModelConfig(
+    api_key=api_key,
+    type=ModelType.OpenAIEmbedding,
+    model=embedding_model,
     max_retries=20,
 )
 
-token_encoder = tiktoken.get_encoding("cl100k_base")
-
-text_embedder = OpenAIEmbedding(
-    api_key=api_key,
-    api_base=None,
-    api_type=OpenaiApiType.OpenAI,
-    model=embedding_model,
-    deployment_name=embedding_model,
-    max_retries=20,
+text_embedder = ModelManager().get_or_create_embedding_model(
+    name="local_search_embedding",
+    model_type=ModelType.OpenAIEmbedding,
+    config=embedding_config,
 )
 
 context_builder = LocalSearchMixedContext(
@@ -80,27 +83,13 @@ context_builder = LocalSearchMixedContext(
     text_units=text_units,
     entities=entities,
     relationships=relationships,
+    # if you did not run covariates during indexing, set this to None
+    covariates=None,
     entity_text_embeddings=description_embedding_store,
     embedding_vectorstore_key=EntityVectorStoreKey.ID,  # if the vectorstore uses entity title as ids, set this to EntityVectorStoreKey.TITLE
     text_embedder=text_embedder,
     token_encoder=token_encoder,
 )
-
-# text_unit_prop: proportion of context window dedicated to related text units
-# community_prop: proportion of context window dedicated to community reports.
-# The remaining proportion is dedicated to entities and relationships. Sum of text_unit_prop and community_prop should be <= 1
-# conversation_history_max_turns: maximum number of turns to include in the conversation history.
-# conversation_history_user_turns_only: if True, only include user queries in the conversation history.
-# top_k_mapped_entities: number of related entities to retrieve from the entity description embedding store.
-# top_k_relationships: control the number of out-of-network relationships to pull into the context window.
-# include_entity_rank: if True, include the entity rank in the entity table in the context window. Default entity rank = node degree.
-# include_relationship_weight: if True, include the relationship weight in the context window.
-# include_community_rank: if True, include the community rank in the context window.
-# return_candidate_context: if True, return a set of dataframes containing all candidate entity/relationship/covariate records that
-# could be relevant. Note that not all of these records will be included in the context window. The "in_context" column in these
-# dataframes indicates whether the record is included in the context window.
-# max_tokens: maximum number of tokens to use for the context window.
-
 
 local_context_params = {
     "text_unit_prop": 0.5,
@@ -117,17 +106,16 @@ local_context_params = {
     "max_tokens": 12_000,  # change this based on the token limit you have on your model (if you are using a model with 8k limit, a good setting could be 5000)
 }
 
-llm_params = {
+model_params = {
     "max_tokens": 2_000,  # change this based on the token limit you have on your model (if you are using a model with 8k limit, a good setting could be 1000=1500)
     "temperature": 0.0,
 }
 
 search_engine = LocalSearch(
-    llm=llm,
+    model=chat_model,
     context_builder=context_builder,
     token_encoder=token_encoder,
-    llm_params=llm_params,
+    model_params=model_params,
     context_builder_params=local_context_params,
     response_type="multiple paragraphs",  # free form text describing the response type and format, can be anything, e.g. prioritized list, single paragraph, multiple paragraphs, multiple-page report
 )
-

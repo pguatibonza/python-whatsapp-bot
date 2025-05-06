@@ -25,5 +25,10 @@ google_auth_oauthlib
 google-auth 
 google-auth-httplib2 
 google-api-python-client
-graphrag
+graphrag==2.2.1
 quart
+langgraph-cli[inmem]
+langgraph-checkpoint-postgres
+psycopg[binary]
+psycopg[pool]
+langchain_experimental
