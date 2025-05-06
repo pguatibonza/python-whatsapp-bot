@@ -93,7 +93,7 @@ db/
 
 data/
 
-.pickle
+token.pickle
 docs/
 chatbot/
 *.sql
