@@ -20,6 +20,8 @@ class SupabaseService:
     """
 
     _client: Client = None
+    _embeddings = None
+    _vector_store=None
 
     @classmethod
     def get_client(cls) -> Client:
@@ -37,6 +39,13 @@ class SupabaseService:
             cls._client = create_client(supabase_url, supabase_key)
             logging.info("Supabase client initialized successfully.")
         return cls._client
+    
+    @classmethod 
+    def get_embeddings(cls):
+        if cls._embeddings is None:
+            cls._embeddings = OpenAIEmbeddings()
+        return cls._embeddings
+    
 
     @classmethod
     def load_vector_store(cls) -> SupabaseVectorStore:
@@ -46,15 +55,19 @@ class SupabaseService:
         Returns:
             SupabaseVectorStore: Initialized vector store.
         """
+        
+
         table_name = settings.TABLE_NAME
         supabase = cls.get_client()
-        embeddings = OpenAIEmbeddings()
-        return SupabaseVectorStore(
-            embedding=embeddings,
-            table_name=table_name,
-            client=supabase,
-            query_name="match_documents",
-        )
+        embeddings = cls.get_embeddings()
+        if cls._vector_store is None:
+            cls._vector_store=SupabaseVectorStore(
+                embedding=embeddings,
+                table_name=table_name,
+                client=supabase,
+                query_name="match_documents",
+            )
+        return cls._vector_store
 
     @classmethod
     def load_vehicle_brands_models(cls) -> list[dict]:

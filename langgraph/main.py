@@ -1,3 +1,4 @@
+from psycopg_pool import AsyncConnectionPool
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException,Request
 from fastapi.security import HTTPBearer
@@ -6,19 +7,38 @@ from typing import List
 from src.langgraph_service import generate_response,_init_graph
 from contextlib import asynccontextmanager
 from models import ChatRequest,ChatResponse
+from supabase import create_client
+
+
 
 settings = Settings()
 settings.configure_logging()
 
-graph_app=None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. On startup, initialize the LangGraph workflow
-    app.state.graph_app = await _init_graph()
+    connection_kwargs = {
+    "autocommit": True,
+    "prepare_threshold": 0,
+    }   
+
+    app.state.supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY) #Create supabase client
+    # Build a shared Postgres connection pool
+    app.state.pg_pool = AsyncConnectionPool(
+        conninfo=settings.DB_URI,
+        min_size=2,       # keep a few idle connections
+        open=False,
+        max_size=20,      # cap total concurrent clients
+        kwargs=connection_kwargs
+    )
+    await app.state.pg_pool.open()
+    
+
+    # Compile LangGraph using this pool
+    app.state.graph_app = await _init_graph(pool=app.state.pg_pool)
     yield
-    # 2. (Optional) On shutdown, you could close resources:
-    # await app.state.graph_app.close()  # if you implement a shutdown hook
+
 
 app = FastAPI(lifespan=lifespan)
 @app.post("/chat", response_model=ChatResponse)

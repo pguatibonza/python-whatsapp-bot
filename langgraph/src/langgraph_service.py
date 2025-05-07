@@ -34,15 +34,11 @@ from langchain_core.messages import AnyMessage
 from langchain.schema import AIMessage
 from langchain_core.messages import ToolMessage, HumanMessage, RemoveMessage, SystemMessage
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.postgres import PostgresSaver
+
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 import logging
-import os
 from dotenv import load_dotenv
-import asyncio
-from asyncio import WindowsSelectorEventLoopPolicy
-import sys
 
 #import our custom modules
 from src import tools , agents
@@ -50,8 +46,6 @@ from src.graphrag_service import search_engine
 from config import Settings
 # Load environment variables
 load_dotenv()
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 settings=Settings()
 # Load environment configuration
@@ -603,28 +597,13 @@ workflow.add_edge("summarize_conversation", END)
 # Initialize memory checkpointer for the state graph
 # (Here using in-memory storage; consider switching to a persistent database for production)
 # Optional: tune these for your workload
-connection_kwargs = {
-    "autocommit": True,
-    "prepare_threshold": 0,
-}
-async def _init_graph():
 
-    # 1. create async pool
-    pool = AsyncConnectionPool(
-        conninfo=DB_URI,
-        min_size=0,
-        open=False,
-        max_size=20,
-        kwargs=connection_kwargs,
-    )
-
-    await pool.open()
-    # 2. make async saver and ensure table exists
+async def _init_graph(*, pool: AsyncConnectionPool):
+    # 1. use the passed-in pool, no need to recreate
     saver = AsyncPostgresSaver(pool)
     await saver.setup()
-    # 3. compile once with this saver
     return workflow.compile(checkpointer=saver)
-    # at module import, block until Graph is ready
+
    
 # Compile the state graph with memory checkpointer.
 app = None
