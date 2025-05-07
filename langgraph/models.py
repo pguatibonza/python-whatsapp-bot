@@ -6,4 +6,4 @@ class ChatRequest(BaseModel):
     message: str
 
 class ChatResponse(BaseModel):
-    reply: str
+    reply: list[str]

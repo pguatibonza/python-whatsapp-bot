@@ -160,7 +160,7 @@ async def primary_assistant(state: GraphState) -> dict:
     Returns:
         dict: Updated state containing the agent's response or a fallback error message.
     """
-    logging.debug("Entering primary_assistant node")
+    logging.info("Entering primary_assistant node")
     user_input = state["user_input"]
     try:
         response = await main_agent.ainvoke({
@@ -171,7 +171,7 @@ async def primary_assistant(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in primary_assistant: %s", e)
         response = SystemMessage(content="Lo siento, ocurrió un error al procesar tu consulta general. Por favor, inténtalo de nuevo.")
-    logging.debug(f"Response from primary_assistant: {response.content}")
+    logging.info(f"Response from primary_assistant: {response.content}")
     return {"messages": [response], "user_input": user_input}
 
 async def appointment_assistant(state: GraphState) -> dict:
@@ -184,7 +184,7 @@ async def appointment_assistant(state: GraphState) -> dict:
     Returns:
         dict: Updated state with the appointment agent's response or fallback error message.
     """
-    logging.debug("Entering appointment_assistant node")
+    logging.info("Entering appointment_assistant node")
     user_input = state["user_input"]
     try:
         response = await appointment_agent.ainvoke({
@@ -195,7 +195,7 @@ async def appointment_assistant(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in appointment_assistant: %s", e)
         response = SystemMessage(content="Lo siento, no se pudo procesar la solicitud de cita. Por favor, inténtalo nuevamente.")
-    logging.debug(f"Response from appointment_assistant: {response.content}")
+    logging.info(f"Response from appointment_assistant: {response.content}")
     return {"messages": [response]}
 
 async def rag_router(state: GraphState) -> dict:
@@ -208,7 +208,7 @@ async def rag_router(state: GraphState) -> dict:
     Returns:
         dict: Updated state with the router's response or fallback error message.
     """
-    logging.debug("Entering rag router node")
+    logging.info("Entering rag router node")
     user_input = state["user_input"]
     try:
         response = await context_router.ainvoke({
@@ -221,7 +221,7 @@ async def rag_router(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in rag_router: %s", e)
         response = SystemMessage(content="Lo siento, ocurrió un error al determinar la ruta. Por favor, inténtalo de nuevo.")
-    logging.debug(f"Router response: {response}")
+    logging.info(f"Router response: {response}")
     return {"messages": [response]}
 
 async def graph_rag(state: GraphState) -> dict:
@@ -234,7 +234,7 @@ async def graph_rag(state: GraphState) -> dict:
     Returns:
         dict: Contains aggregated context and tool response messages, or fallback message on error.
     """
-    logging.debug("Entering graph rag node")
+    logging.info("Entering graph rag node")
     final_response = ""
     messages = []
     try:
@@ -252,7 +252,7 @@ async def graph_rag(state: GraphState) -> dict:
         logging.error("Error in graph_rag: %s", e)
         final_response = "Lo siento, ocurrió un error al obtener la información técnica."
         messages = [SystemMessage(content=final_response)]
-    logging.debug(f"Response from graph rag: {final_response}")
+    logging.info(f"Response from graph rag: {final_response}")
     return {"context": final_response, "messages": messages}
 
 async def db_context(state: GraphState) -> dict:
@@ -265,7 +265,7 @@ async def db_context(state: GraphState) -> dict:
     Returns:
         dict: Updated state with dealership context and corresponding messages, or fallback error message.
     """
-    logging.debug("Entering db context node")
+    logging.info("Entering db context node")
     final_response = ""
     messages = []
     try:
@@ -283,7 +283,7 @@ async def db_context(state: GraphState) -> dict:
         logging.error("Error in db_context: %s", e)
         final_response = "Lo siento, no se pudo recuperar la información de concesionarios."
         messages = [SystemMessage(content=final_response)]
-    logging.debug(f"Response from db context: {final_response}")
+    logging.info(f"Response from db context: {final_response}")
     return {"context": final_response, "messages": messages}
 
 async def rag_assistant(state: GraphState) -> dict:
@@ -296,7 +296,7 @@ async def rag_assistant(state: GraphState) -> dict:
     Returns:
         dict: Updated state containing the RAG agent's response or a fallback message.
     """
-    logging.debug("Entering rag assistant node")
+    logging.info("Entering rag assistant node")
     user_input = state["user_input"]
     context = state.get("context", "")
     try:
@@ -309,7 +309,7 @@ async def rag_assistant(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in rag_assistant: %s", e)
         response = SystemMessage(content="Lo siento, hubo un problema al procesar tu consulta técnica. Por favor, inténtalo de nuevo.")
-    logging.debug(f"Response from rag assistant: {response.content}")
+    logging.info(f"Response from rag assistant: {response.content}")
     return {"messages": [response]}
 
 async def multimedia_assistant(state: GraphState) -> dict:
@@ -322,7 +322,7 @@ async def multimedia_assistant(state: GraphState) -> dict:
     Returns:
         dict: Updated state with the multimedia agent's response or fallback message.
     """
-    logging.debug("Entering multimedia assistant node")
+    logging.info("Entering multimedia assistant node")
     user_input = state["user_input"]
     try:
         response = await multimedia_agent.ainvoke({
@@ -333,7 +333,7 @@ async def multimedia_assistant(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in multimedia_assistant: %s", e)
         response = SystemMessage(content="Lo siento, no se pudo obtener el contenido multimedia. Inténtalo nuevamente.")
-    logging.debug(f"Response from multimedia assistant: {response.content}")
+    logging.info(f"Response from multimedia assistant: {response.content}")
     return {"messages": [response]}
 
 async def response_assistant(state: GraphState) -> dict:
@@ -346,7 +346,7 @@ async def response_assistant(state: GraphState) -> dict:
     Returns:
         dict: Updated state with the final consolidated response or fallback error message.
     """
-    logging.debug("Entering final response node")
+    logging.info("Entering final response node")
     user_input = state["user_input"]
     try:
         last_response = state["messages"][-1].content  # Latest message as context
@@ -359,7 +359,7 @@ async def response_assistant(state: GraphState) -> dict:
     except Exception as e:
         logging.error("Error in response_assistant: %s", e)
         response = SystemMessage(content="Lo siento, ocurrió un error al generar la respuesta final. Por favor, inténtalo de nuevo.")
-    logging.debug(f"Response from Response assistant: {response.content}")
+    logging.info(f"Response from Response assistant: {response.content}")
     
     return {"messages": [response]}
 
@@ -628,7 +628,7 @@ async def _init_graph():
    
 # Compile the state graph with memory checkpointer.
 app = None
-config = {"configurable": {"thread_id": "6"}}
+
 
 # -------------------------
 # Generate Response Function

@@ -1,7 +1,10 @@
 
 from pydantic_settings import BaseSettings
-
+import logging, sys
+from pythonjsonlogger import jsonlogger
 class Settings(BaseSettings):
+    LOG_LEVEL: str = "INFO"
+    
     # LangGraph / FastAPI
     DB_URI: str
     OPENAI_API_KEY: str
@@ -19,6 +22,21 @@ class Settings(BaseSettings):
     GRAPHRAG_API_KEY: str
     GRAPHRAG_LLM_MODEL: str
     GRAPHRAG_EMBEDDING_MODEL: str
+
+    def configure_logging(self):
+        # remove existing handlers
+        root = logging.getLogger()
+        for h in list(root.handlers):
+            root.removeHandler(h)
+        # attach JSON handler
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            jsonlogger.JsonFormatter(
+                "%(asctime)s %(levelname)s %(name)s %(message)s"
+            )
+        )
+        root.addHandler(handler)
+        root.setLevel(self.LOG_LEVEL)
 
     class Config:
         env_file = ".env"
