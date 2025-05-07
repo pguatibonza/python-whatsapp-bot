@@ -614,6 +614,8 @@ async def _init_graph():
     # 1. create async pool
     pool = AsyncConnectionPool(
         conninfo=DB_URI,
+        min_size=0,
+        open=False,
         max_size=20,
         kwargs=connection_kwargs,
     )
