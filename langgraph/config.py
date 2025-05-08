@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     LANGCHAIN_PROJECT: str
     LANGCHAIN_API_KEY: str
     LANGCHAIN_TRACING_V2: str
-    GOOGLE_API_KEY:str
+    GOOGLE_CREDENTIALS_PATH:str
+    GOOGLE_TOKEN_PATH : str
 
     # Graphrag
     GRAPHRAG_API_KEY: str

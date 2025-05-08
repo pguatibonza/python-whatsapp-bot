@@ -26,13 +26,19 @@ from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.supabase_service import SupabaseService
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from config import Settings
+import logging
 
 # -------------------------
 # Google Calendar Integration
 # -------------------------
-
+settings=Settings()
 SCOPES = ['https://www.googleapis.com/auth/calendar']
-
+CREDENTIALS_PATH=settings.GOOGLE_CREDENTIALS_PATH
+TOKEN_PATH=settings.GOOGLE_TOKEN_PATH
+print(TOKEN_PATH)
 def get_calendar_service():
     """
     Initializes and returns a Google Calendar service object.
@@ -43,18 +49,21 @@ def get_calendar_service():
         A Google Calendar service instance.
     """
     creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
+    if os.path.exists(TOKEN_PATH):
+        with open(TOKEN_PATH, 'rb') as token:
             creds = pickle.load(token)
     if not creds or not creds.valid:
+        logging.info("Access token expired, refreshing...")
         if creds and creds.expired and creds.refresh_token:
             print("Refreshing credentials...")
             creds.refresh(Request())
+            print("Credentials Refreshed.")
         else:
+            logging.info("No valid token found; starting console OAuth flow...")
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
+        with open(TOKEN_PATH, 'wb') as token:
             pickle.dump(creds, token)
     service = build('calendar', 'v3', credentials=creds)
     return service

@@ -2,10 +2,8 @@ python-dotenv
 openai
 langchain
 langchain-openai
-faiss-cpu
 opencv-python
 psycopg2-binary
-redis
 supabase
 langgraph
 langsmith
