@@ -5,25 +5,27 @@ from fastapi.security import HTTPBearer
 from config import Settings
 from typing import List
 from src.langgraph_service import generate_response,_init_graph
+from src.tools import get_calendar_service
 from contextlib import asynccontextmanager
 from models import ChatRequest,ChatResponse
+from src.supabase_service import SupabaseService
 from supabase import create_client
-
+import logging
+import asyncio
 
 
 settings = Settings()
 settings.configure_logging()
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
     connection_kwargs = {
     "autocommit": True,
     "prepare_threshold": 0,
-    }   
+    }     
 
-    app.state.supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY) #Create supabase client
     # Build a shared Postgres connection pool
     app.state.pg_pool = AsyncConnectionPool(
         conninfo=settings.DB_URI,
@@ -34,6 +36,18 @@ async def lifespan(app: FastAPI):
     )
     await app.state.pg_pool.open()
     
+    # Initialize Google Calendar service 
+    async def _init_calendar():
+        return await asyncio.to_thread(get_calendar_service)
+    try:
+        app.state.calendar_service = await asyncio.wait_for(_init_calendar(), timeout=30)
+        logging.info("Calendar service initialized")
+    except asyncio.TimeoutError:
+        logging.error("Calendar init timed out after 30s; skipping calendar")
+        app.state.calendar_service = None
+    except Exception:
+        logging.exception("Calendar service init failed; continuing without calendar")
+        app.state.calendar_service = None
 
     # Compile LangGraph using this pool
     app.state.graph_app = await _init_graph(pool=app.state.pg_pool)

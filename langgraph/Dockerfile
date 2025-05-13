@@ -4,5 +4,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 COPY . .
-EXPOSE 8000
+ENV OAUTHLIB_INSECURE_TRANSPORT=1
+EXPOSE 8000 8080
 CMD ["uvicorn", "main:app", "--host","0.0.0.0","--port","8000"]

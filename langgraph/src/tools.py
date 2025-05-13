@@ -17,19 +17,22 @@ StructuredTool instances for safe integration into the LangGraph workflow.
 import os
 import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request as GoogleRequest
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from langchain.tools import BaseTool, StructuredTool, tool
+from langchain.tools import StructuredTool
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.supabase_service import SupabaseService
-from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from config import Settings
 import logging
+from fastapi import Depends, Request
+import concurrent.futures
+import asyncio
+
 
 # -------------------------
 # Google Calendar Integration
@@ -38,39 +41,46 @@ settings=Settings()
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 CREDENTIALS_PATH=settings.GOOGLE_CREDENTIALS_PATH
 TOKEN_PATH=settings.GOOGLE_TOKEN_PATH
+OAUTH_TIMEOUT    = 30  
 print(TOKEN_PATH)
-def get_calendar_service():
+
+
+def get_calendar_dep(request: Request):
+    svc = request.app.state.calendar_service
+    if svc is None:
+        raise RuntimeError("Calendar service unavailable")
+    return svc
+
+
+
+def get_calendar_service(credentials_path: str = CREDENTIALS_PATH,
+                         token_path: str = TOKEN_PATH):
     """
-    Initializes and returns a Google Calendar service object.
-    
-    Uses credentials stored in 'token.pickle' or initiates a new OAuth flow if necessary.
-    
-    Returns:
-        A Google Calendar service instance.
+    Blocking init of Google Calendar client.
+    Raises on error or interactive timeout is handled upstream.
     """
     creds = None
-    if os.path.exists(TOKEN_PATH):
-        with open(TOKEN_PATH, 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        logging.info("Access token expired, refreshing...")
-        if creds and creds.expired and creds.refresh_token:
-            print("Refreshing credentials...")
-            creds.refresh(Request())
-            print("Credentials Refreshed.")
-        else:
-            logging.info("No valid token found; starting console OAuth flow...")
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open(TOKEN_PATH, 'wb') as token:
-            pickle.dump(creds, token)
-    service = build('calendar', 'v3', credentials=creds)
-    return service
+    if os.path.exists(token_path):
+        with open(token_path, "rb") as f:
+            creds = pickle.load(f)
 
-# Initialize the calendar service
-service = get_calendar_service()
+    # refresh if expired
+    if creds and getattr(creds, "expired", False) and creds.refresh_token:
+        creds.refresh(GoogleRequest())
 
+    # first run: interactive consent
+    elif not creds:
+        flow = InstalledAppFlow.from_client_secrets_file(
+            credentials_path, SCOPES
+        )
+        creds = flow.run_local_server(
+            port=8080, open_browser=False,
+            authorization_prompt_message="Please visit: {url}"
+        )
+        with open(token_path, "wb") as f:
+            pickle.dump(creds, f)
+
+    return build("calendar", "v3", credentials=creds)
 # -------------------------
 # Appointment Scheduling Tools
 # -------------------------
@@ -78,7 +88,7 @@ WORKERS = ["pabloalejandrogb1@gmail.com", "p.guatibonza@uniandes.edu.co", "andre
 WORKING_HOURS = (8, 17)
 MAX_APPOINTMENTS_PER_SLOT = len(WORKERS)
 
-def get_available_time_slots(date: str):
+def get_available_time_slots(date: str,svc=Depends(get_calendar_dep)):
     """
     Retrieves available time slots for a given date within defined working hours.
     
@@ -91,7 +101,7 @@ def get_available_time_slots(date: str):
     """
     start_of_day = datetime.strptime(date, '%Y-%m-%d').replace(hour=WORKING_HOURS[0], minute=0, second=0)
     end_of_day = datetime.strptime(date, '%Y-%m-%d').replace(hour=WORKING_HOURS[1], minute=0, second=0)
-    events_result = service.events().list(
+    events_result = svc.events().list(
         calendarId='primary',
         timeMin=start_of_day.isoformat() + 'Z',
         timeMax=end_of_day.isoformat() + 'Z',
@@ -137,7 +147,7 @@ tool_is_time_slot_available = StructuredTool.from_function(
     handle_tool_error=True
 )
 
-def assign_available_worker(date: str, time_slot: str):
+def assign_available_worker(date: str, time_slot: str,svc=Depends(get_calendar_dep)):
     """
     Assigns an available worker for a given date and time slot.
     
@@ -153,7 +163,7 @@ def assign_available_worker(date: str, time_slot: str):
     """
     start_time = datetime.strptime(f"{date}T{time_slot}:00-05:00", '%Y-%m-%dT%H:%M:%S%z')
     end_time = start_time + timedelta(hours=1)
-    events_result = service.events().list(
+    events_result = svc.events().list(
         calendarId='primary',
         timeMin=start_time.isoformat(),
         timeMax=end_time.isoformat(),
@@ -170,7 +180,7 @@ def assign_available_worker(date: str, time_slot: str):
             return worker
     raise ValueError(f"No workers are available for the time slot {time_slot} on {date}.")
 
-def create_event_test_drive(car_model: str, name: str, lastname: str, customer_email: str, date_begin: str, date_finish: str, notes=""):
+def create_event_test_drive(car_model: str, name: str, lastname: str, customer_email: str, date_begin: str, date_finish: str, notes="",svc=Depends(get_calendar_dep)):
     """
     Creates a test drive appointment event for a vehicle.
     
@@ -209,7 +219,7 @@ def create_event_test_drive(car_model: str, name: str, lastname: str, customer_e
             {'email': assigned_worker}
         ]
     }
-    event = service.events().insert(calendarId='primary', body=event).execute()
+    event = svc.events().insert(calendarId='primary', body=event).execute()
     return event
 
 tool_create_event_test_drive = StructuredTool.from_function(

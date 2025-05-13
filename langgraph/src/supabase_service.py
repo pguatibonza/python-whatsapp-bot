@@ -1,5 +1,7 @@
 import os
 from dotenv import load_dotenv
+from fastapi import Request
+from fastapi import Depends
 from langchain_community.document_loaders import PDFMinerLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -13,6 +15,7 @@ from config import Settings
 
 settings=Settings()
 
+
 class SupabaseService:
     """
     Class to manage the connection and operations with Supabase.
@@ -22,6 +25,7 @@ class SupabaseService:
     _client: Client = None
     _embeddings = None
     _vector_store=None
+    
 
     @classmethod
     def get_client(cls) -> Client:
@@ -33,10 +37,8 @@ class SupabaseService:
             Client: Supabase client instance.
         """
         if cls._client is None:
-            logging.info("Initializing Supabase client for the first time...")
-            supabase_url = settings.SUPABASE_URL
-            supabase_key = settings.SUPABASE_KEY
-            cls._client = create_client(supabase_url, supabase_key)
+            
+            cls._client=create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
             logging.info("Supabase client initialized successfully.")
         return cls._client
     
