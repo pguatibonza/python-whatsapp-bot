@@ -24,9 +24,16 @@ Create a `.env` file in the project root with the following variables:
 
 ```dotenv
 # Shared variables
-APP_SECRET=655a7404ac73508a3fd502795fc04151
-RECIPIENT_WAID=<your_whatsapp_wa_id>
+APP_SECRET
+ACCESS_TOKEN
+APP_ID
+APP_SECRET
+RECIPIENT_WAID
+VERSION=v19.0
+PHONE_NUMBER_ID
+VERIFY_TOKEN
 LANGGRAPH_URL=http://langgraph-service:8000
+
 
 # Quart App-specific
 PORT=8080
