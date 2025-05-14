@@ -16,19 +16,14 @@ The module also defines functions for:
 
 External dependencies include LangChain, LangGraph, and environment configuration.
 """
-from datetime import datetime
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_core.output_parsers import StrOutputParser
 from typing import Annotated, Callable
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain.schema import Document
 from langgraph.prebuilt import ToolNode, tools_condition
-from typing import Literal, List, Union, Optional
-from langchain_core.prompts import ChatPromptTemplate
+from typing import Literal, List, Optional
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import MemorySaver
 from pprint import pprint
 from langchain_core.messages import AnyMessage
 from langchain.schema import AIMessage

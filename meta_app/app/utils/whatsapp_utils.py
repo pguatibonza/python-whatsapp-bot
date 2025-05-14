@@ -4,12 +4,9 @@ import re
 import asyncio
 from datetime import datetime, timedelta
 from collections import deque
-
 from quart import current_app, jsonify
 import httpx  # Use httpx for asynchronous HTTP requests
 
-# Import your response generators
-from app.services.langgraph_service import generate_response
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +20,24 @@ dedup_store = deque()
 dedup_set = set()
 DEDUP_TTL_SECONDS = 300  # 5 minutes
 dedup_lock = asyncio.Lock()
+
+
+
+LANGGRAPH_URL = current_app
+
+async def generate_response(message_body: str, wa_id: str) -> list[str]:
+    """
+    Sends the incoming WhatsApp message off to LangGraph and returns
+    the list of string replies from the `reply: list[str]` field.
+    """
+    payload = {"wa_id": wa_id, "message": message_body}
+    async with httpx.AsyncClient() as client:
+        r = await client.post(f"{current_app.config['LANGGRAPH_URL']}/chat", json=payload, timeout=60.0)
+        r.raise_for_status()
+        data = r.json()
+    # data should conform to ChatResponse, i.e. {"reply": ["...","..."]}
+    return data["reply"]
+
 
 def log_http_response(response: httpx.Response):
     logging.info(f"Status: {response.status_code}")
@@ -118,6 +133,7 @@ async def process_whatsapp_message(body: dict):
     try:
         # Generate responses asynchronously
         responses = await generate_response(message_body, wa_id)
+        
     except Exception as e:
         logging.error(f"Error generating response: {e}")
         return jsonify({"status": "error", "message": "Failed to generate response"}), 500

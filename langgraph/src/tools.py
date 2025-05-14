@@ -21,7 +21,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request as GoogleRequest
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from langchain.tools import StructuredTool
 from langchain_openai import ChatOpenAI
@@ -29,10 +28,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.supabase_service import SupabaseService
 from googleapiclient.discovery import build
 from config import Settings
-import logging
-from fastapi import Depends, Request
-import concurrent.futures
-import asyncio
 
 
 # -------------------------

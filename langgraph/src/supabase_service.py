@@ -1,10 +1,4 @@
-import os
-from dotenv import load_dotenv
-from fastapi import Request
-from fastapi import Depends
-from langchain_community.document_loaders import PDFMinerLoader
 from langchain_openai import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from supabase import create_client, Client
 from langchain_community.vectorstores import SupabaseVectorStore
 import logging
