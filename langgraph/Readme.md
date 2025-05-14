@@ -67,7 +67,7 @@ Este repositorio contiene un chatbot potenciado por IA para concesionarios de ve
 ## 2. Configurar Supabase
 
 1. Regístrate en [supabase.com](https://supabase.com) y crea un proyecto.
-2. En **Project Settings > API**, copia tu `SUPABASE_URL` y `SUPABASE_ANON_KEY`.
+2. En **Project Settings > API**, copia tu `SUPABASE_URL` y `SUPABASE_KEY`.
 3. Configura las variables de entorno en `.env`:
 
    ```ini
@@ -95,16 +95,11 @@ LANGCHAIN_PROJECT=los-coches
 LANGCHAIN_TRACING_V2=true
 DB_URI=postgresql://postgres:postgres@host.docker.internal:5432/langgraph?sslmode=disable
 
-# Rutas dentro del contenedor: montadas desde secrets
-GOOGLE_CREDENTIALS_PATH=/run/secrets/calendar-json
-GOOGLE_TOKEN_PATH=/run/secrets/calendar-token
 
 GRAPHRAG_API_KEY=sk-...
 GRAPHRAG_LLM_MODEL=gpt-4o
 GRAPHRAG_EMBEDDING_MODEL=text-embedding-3-small
 ```
-
-> **Nota:** Las rutas para `GOOGLE_CREDENTIALS_PATH` y `GOOGLE_TOKEN_PATH` apuntan a los secretos montados en `/run/secrets/`.
 
 ---
 
@@ -128,8 +123,6 @@ podman build -t langgraph-service .
 podman run -d \
   -p 8000:8000 \
   --env-file .env \
-  --secret calendar-json \
-  --secret calendar-token \
   --name langgraph-service \
   langgraph-service
 ```
