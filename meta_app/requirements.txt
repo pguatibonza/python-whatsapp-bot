@@ -1,0 +1,8 @@
+flask
+python-dotenv
+openai
+libmagic
+python-magic
+quart
+hypercorn
+
