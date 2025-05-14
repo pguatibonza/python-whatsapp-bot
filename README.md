@@ -15,7 +15,7 @@ Both services can be built and run locally using Podman. Follow the steps below 
 * A project root containing:
 
   * `langgraph-service/` directory
-  * `quart-app/` directory
+  * `meta_app/` directory
   * `.env` file with your environment variables
 
 ## Environment Variables
@@ -33,14 +33,6 @@ VERSION=v19.0
 PHONE_NUMBER_ID
 VERIFY_TOKEN
 LANGGRAPH_URL=http://langgraph-service:8000
-
-
-# Quart App-specific
-PORT=8080
-
-# LangGraph Service-specific
-OPENAI_API_KEY=<your_openai_api_key>
-# ...any other variables your FastAPI app requires
 ```
 
 > **Important:** Do **not** surround values with quotes (`"`) in your `.env` file.
