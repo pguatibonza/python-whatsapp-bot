@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from models import ChatRequest,ChatResponse
 from src.supabase_service import SupabaseService
 from supabase import create_client
+import src.tools as tools
 import logging
 import asyncio
 
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
         logging.exception("Calendar service init failed; continuing without calendar")
         app.state.calendar_service = None
 
+    tools.calendar_service = app.state.calendar_service
     # Compile LangGraph using this pool
     app.state.graph_app = await _init_graph(pool=app.state.pg_pool)
     yield

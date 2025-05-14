@@ -16,6 +16,7 @@ StructuredTool instances for safe integration into the LangGraph workflow.
 
 import os
 import pickle
+from typing import Optional
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request as GoogleRequest
 from googleapiclient.discovery import build
@@ -42,16 +43,7 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 CREDENTIALS_PATH=settings.GOOGLE_CREDENTIALS_PATH
 TOKEN_PATH=settings.GOOGLE_TOKEN_PATH
 OAUTH_TIMEOUT    = 30  
-print(TOKEN_PATH)
-
-
-def get_calendar_dep(request: Request):
-    svc = request.app.state.calendar_service
-    if svc is None:
-        raise RuntimeError("Calendar service unavailable")
-    return svc
-
-
+calendar_service : Optional[build]=None
 
 def get_calendar_service(credentials_path: str = CREDENTIALS_PATH,
                          token_path: str = TOKEN_PATH):
@@ -81,6 +73,7 @@ def get_calendar_service(credentials_path: str = CREDENTIALS_PATH,
             pickle.dump(creds, f)
 
     return build("calendar", "v3", credentials=creds)
+
 # -------------------------
 # Appointment Scheduling Tools
 # -------------------------
@@ -88,7 +81,7 @@ WORKERS = ["pabloalejandrogb1@gmail.com", "p.guatibonza@uniandes.edu.co", "andre
 WORKING_HOURS = (8, 17)
 MAX_APPOINTMENTS_PER_SLOT = len(WORKERS)
 
-def get_available_time_slots(date: str,svc=Depends(get_calendar_dep)):
+def get_available_time_slots(date: str):
     """
     Retrieves available time slots for a given date within defined working hours.
     
@@ -99,9 +92,13 @@ def get_available_time_slots(date: str,svc=Depends(get_calendar_dep)):
         list: A list of available time slots as strings formatted in 'HH:MM'.
               Only slots with fewer than the maximum allowed appointments are included.
     """
+    global calendar_service
+    if calendar_service is None:
+        raise RuntimeError("Calendar service not available at the time.")
+    
     start_of_day = datetime.strptime(date, '%Y-%m-%d').replace(hour=WORKING_HOURS[0], minute=0, second=0)
     end_of_day = datetime.strptime(date, '%Y-%m-%d').replace(hour=WORKING_HOURS[1], minute=0, second=0)
-    events_result = svc.events().list(
+    events_result = calendar_service.events().list(
         calendarId='primary',
         timeMin=start_of_day.isoformat() + 'Z',
         timeMax=end_of_day.isoformat() + 'Z',
@@ -137,6 +134,7 @@ def is_time_slot_available(date: str, time_slot: str):
     Returns:
         bool: True if the time slot is available, False otherwise.
     """
+  
     available_slots = get_available_time_slots(date)
     return time_slot in available_slots
 
@@ -147,7 +145,7 @@ tool_is_time_slot_available = StructuredTool.from_function(
     handle_tool_error=True
 )
 
-def assign_available_worker(date: str, time_slot: str,svc=Depends(get_calendar_dep)):
+def assign_available_worker(date: str, time_slot: str):
     """
     Assigns an available worker for a given date and time slot.
     
@@ -161,9 +159,13 @@ def assign_available_worker(date: str, time_slot: str,svc=Depends(get_calendar_d
     Raises:
         ValueError: If no workers are available for the given time slot.
     """
+    global calendar_service
+    if calendar_service is None:
+        raise RuntimeError("Calendar service not available at the time.")
+    
     start_time = datetime.strptime(f"{date}T{time_slot}:00-05:00", '%Y-%m-%dT%H:%M:%S%z')
     end_time = start_time + timedelta(hours=1)
-    events_result = svc.events().list(
+    events_result = calendar_service.events().list(
         calendarId='primary',
         timeMin=start_time.isoformat(),
         timeMax=end_time.isoformat(),
@@ -180,7 +182,7 @@ def assign_available_worker(date: str, time_slot: str,svc=Depends(get_calendar_d
             return worker
     raise ValueError(f"No workers are available for the time slot {time_slot} on {date}.")
 
-def create_event_test_drive(car_model: str, name: str, lastname: str, customer_email: str, date_begin: str, date_finish: str, notes="",svc=Depends(get_calendar_dep)):
+def create_event_test_drive(car_model: str, name: str, lastname: str, customer_email: str, date_begin: str, date_finish: str, notes=""):
     """
     Creates a test drive appointment event for a vehicle.
     
@@ -199,6 +201,10 @@ def create_event_test_drive(car_model: str, name: str, lastname: str, customer_e
     Raises:
         ValueError: If no worker is available for the requested time slot.
     """
+    global calendar_service
+    if calendar_service is None:
+        raise RuntimeError("Calendar service not available at the time.")
+    
     date = date_begin.split('T')[0]
     time_slot = date_begin.split('T')[1][:5]
     assigned_worker = assign_available_worker(date, time_slot)
@@ -219,7 +225,7 @@ def create_event_test_drive(car_model: str, name: str, lastname: str, customer_e
             {'email': assigned_worker}
         ]
     }
-    event = svc.events().insert(calendarId='primary', body=event).execute()
+    event = calendar_service.events().insert(calendarId='primary', body=event).execute()
     return event
 
 tool_create_event_test_drive = StructuredTool.from_function(
@@ -367,7 +373,7 @@ tool_get_car_technical_info = StructuredTool.from_function(
     func=get_car_technical_info, 
     name="get_car_info", 
     description="Obtiene la ficha tecnica y fotos/videos de un carro",
-    handle_tool_error=True
+    handle_tool_error=False
 )
 
 def get_dealership_description(query: str) -> str:

@@ -97,6 +97,7 @@ You will have the following tools at hand:
 
 Important : You must also send the confirmation link to the user
 You cannot make appointments to the past
+If you receive a tool message which contains and error. Answer accordingly, but do not make more tool calls
 
 Current time = {time}
 
